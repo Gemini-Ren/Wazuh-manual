@@ -1,0 +1,65 @@
+<!--  ===========================================================================
+Categoria: Desempenho - Uso de CPU (Windows)
+Descrição: Regras de monitoramento do uso de CPU dos agentes Windows:
+faixas baixo, médio, alto e crítico, e alertas de uso alto ou crítico
+sustentado (3 amostras seguidas no mesmo agente, com coleta a cada 5 minutos).
+Dependência: decoder windows_cpu_usage (campo usage_percent)
+
+Faixa de IDs:
+102500 - 102599
+============================================================================= -->
+
+<group name="windows,cpu_usage,">
+
+  <!-- Regra base: agrupamento inicial para o decoder -->
+  <rule id="102500" level="0">
+    <decoded_as>windows_cpu_usage</decoded_as>
+    <description>Agrupamento de eventos de uso de CPU Windows</description>
+  </rule>
+
+  <!-- ========== Faixas de uso (amostra única) ========== -->
+  <rule id="102501" level="3">
+    <if_sid>102500</if_sid>
+    <field name="usage_percent" type="pcre2">^[0-4]?[0-9](\.[0-9]+)?$</field>
+    <description>Uso de CPU Windows: baixo ($(usage_percent)%)</description>
+  </rule>
+
+  <rule id="102502" level="5">
+    <if_sid>102500</if_sid>
+    <field name="usage_percent" type="pcre2">^[5-7][0-9](\.[0-9]+)?$</field>
+    <description>Uso de CPU Windows: médio ($(usage_percent)%)</description>
+  </rule>
+
+  <rule id="102503" level="7">
+    <if_sid>102500</if_sid>
+    <field name="usage_percent" type="pcre2">^[89][0-9](\.[0-9]+)?$</field>
+    <description>Uso de CPU Windows: alto ($(usage_percent)%)</description>
+    <group>cpu_high,</group>
+  </rule>
+
+  <rule id="102504" level="10">
+    <if_sid>102500</if_sid>
+    <field name="usage_percent" type="pcre2">^100(\.0+)?$</field>
+    <description>Uso de CPU Windows: crítico ($(usage_percent)%)</description>
+    <group>cpu_high,</group>
+  </rule>
+
+  <!-- ========== Uso sustentado (mesmo agente) ========== -->
+  <!-- Uso sustentado no mesmo agente. Coleta a cada 5 minutos: 3 amostras
+       seguidas cobrem cerca de 15 minutos. A mais grave vem primeiro.
+       O ignore vale para a regra inteira (todos os agentes), por isso é curto. -->
+  <rule id="102505" level="13" frequency="3" timeframe="900" ignore="900">
+    <if_matched_sid>102504</if_matched_sid>
+    <same_location />
+    <description>Uso de CPU Windows crítico sustentado: 3 amostras seguidas em 100% (cerca de 15 minutos)</description>
+    <options>alert_by_email</options>
+  </rule>
+
+  <rule id="102506" level="12" frequency="3" timeframe="900" ignore="900">
+    <if_matched_group>cpu_high</if_matched_group>
+    <same_location />
+    <description>Uso de CPU Windows alto sustentado: 3 amostras seguidas acima de 80% (cerca de 15 minutos)</description>
+    <options>alert_by_email</options>
+  </rule>
+
+</group>

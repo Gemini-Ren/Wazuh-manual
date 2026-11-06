@@ -1,0 +1,51 @@
+<!--  ===========================================================================
+Categoria: Desempenho - Uso de RAM (Windows)
+Descrição: Regras de monitoramento do uso de memória RAM dos agentes
+Windows: faixas baixo, médio, alto, muito alto e crítico.
+Sem e-mail: o uso de RAM oscila muito, então os níveis ficam abaixo de 12
+(nível a partir do qual o Wazuh envia e-mail automaticamente).
+Dependência: decoder windows_ram_usage (campo usage_percent)
+
+Faixa de IDs:
+102600 - 102699
+============================================================================= -->
+
+<group name="windows,ram_usage,">
+
+  <!-- Regra base: agrupamento inicial para o decoder -->
+  <rule id="102600" level="0">
+    <decoded_as>windows_ram_usage</decoded_as>
+    <description>Agrupamento de eventos de uso de RAM Windows</description>
+  </rule>
+
+  <rule id="102601" level="3">
+    <if_sid>102600</if_sid>
+    <field name="usage_percent" type="pcre2">^[0-4]?[0-9](\.[0-9]+)?$</field>
+    <description>Uso de RAM Windows: baixo ($(usage_percent)%)</description>
+  </rule>
+
+  <rule id="102602" level="5">
+    <if_sid>102600</if_sid>
+    <field name="usage_percent" type="pcre2">^[5-7][0-9](\.[0-9]+)?$</field>
+    <description>Uso de RAM Windows: médio ($(usage_percent)%)</description>
+  </rule>
+
+  <rule id="102603" level="7">
+    <if_sid>102600</if_sid>
+    <field name="usage_percent" type="pcre2">^8[0-9](\.[0-9]+)?$</field>
+    <description>Uso de RAM Windows: alto ($(usage_percent)%)</description>
+  </rule>
+
+  <rule id="102604" level="10">
+    <if_sid>102600</if_sid>
+    <field name="usage_percent" type="pcre2">^9[0-9](\.[0-9]+)?$</field>
+    <description>Uso de RAM Windows: muito alto ($(usage_percent)%)</description>
+  </rule>
+
+  <rule id="102605" level="11">
+    <if_sid>102600</if_sid>
+    <field name="usage_percent" type="pcre2">^100(\.0+)?$</field>
+    <description>Uso de RAM Windows: crítico ($(usage_percent)%)</description>
+  </rule>
+
+</group>

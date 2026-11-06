@@ -1,0 +1,56 @@
+<!--  ===========================================================================
+Categoria: Threat Intelligence / Abuso
+Descrição: Regras de reputação e abuso de IPs externos: alertas do Suricata
+vindos de fora das redes internas, scans do Modat.io (lista modat-range)
+e rebaixamento da nativa de múltiplos bloqueios do firewall (87702).
+Dependência: lista etc/lists/modat-range
+
+Faixa de IDs:
+101200 - 101299
+============================================================================= -->
+
+<group name="suricata,ids,modat,threat-intelligence,">
+
+  <!-- ========== Suricata: IP externo (base) ========== -->
+  <!-- Redes internas consideradas: faixas privadas RFC 1918 (ajuste ao seu ambiente) -->
+  <rule id="101200" level="2">
+    <if_sid>86601</if_sid>
+    <field name="flow.src_ip" type="pcre2">^(?!10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.)</field>
+    <description>[SURICATA] Tentativa de IP externo: $(flow.src_ip)</description>
+  </rule>
+
+  <!-- ========== Modat.io: scans conhecidos ========== -->
+  <rule id="101201" level="2">
+    <if_sid>101200</if_sid>
+    <list field="flow.src_ip" lookup="address_match_key">etc/lists/modat-range</list>
+    <description>[MODAT.IO] Scan de IPs públicos a partir de $(flow.src_ip)</description>
+  </rule>
+
+  <rule id="101202" level="7" frequency="3" timeframe="300" ignore="600">
+    <if_matched_sid>101201</if_matched_sid>
+    <same_field>flow.src_ip</same_field>
+    <description>[MODAT.IO] Múltiplos scans de IPs públicos da organização a partir de $(flow.src_ip)</description>
+  </rule>
+
+  <!-- ========== IP externo fora do Modat.io ========== -->
+  <rule id="101203" level="11">
+    <if_sid>101200</if_sid>
+    <list field="flow.src_ip" lookup="not_address_match_key">etc/lists/modat-range</list>
+    <description>[SURICATA] Alerta de IP externo não catalogado: $(flow.src_ip)</description>
+  </rule>
+
+  <rule id="101204" level="12" frequency="5" timeframe="180" ignore="300">
+    <if_matched_sid>101203</if_matched_sid>
+    <same_field>flow.src_ip</same_field>
+    <description>[SURICATA] Múltiplas tentativas do IP externo $(flow.src_ip)</description>
+  </rule>
+
+  <!-- ========== Firewall ========== -->
+  <!-- Rebaixa a nativa 87702 (múltiplos bloqueios); a correlação de bloqueios
+       fica na 102403 do 918-pfsense-filter-rules.xml -->
+  <rule id="101205" level="2">
+    <if_sid>87702</if_sid>
+    <description>Firewall: múltiplos bloqueios do mesmo evento</description>
+  </rule>
+
+</group>

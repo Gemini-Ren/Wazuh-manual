@@ -1,0 +1,58 @@
+<!--  ===========================================================================
+Categoria: Windows - Informações do Sistema
+Descrição: Rebaixamento de eventos informativos do Windows e do SQL Server:
+timeout do VSS, erros do MSSQL (instância padrão e nomeadas), encerramento
+do Desktop Window Manager e agendamento do serviço de proteção de software.
+
+Faixa de IDs:
+100300 - 100399
+============================================================================= -->
+
+<group name="windows,system,infos,">
+
+  <!-- VSS -->
+  <rule id="100300" level="2">
+    <if_sid>60702</if_sid>
+    <description>Volume Shadow Copy Service (VSS) desativado após atingir o tempo limite</description>
+    <options>no_full_log</options>
+  </rule>
+
+  <!-- SQL Server: MSSQLSERVER (instância padrão) ou MSSQL$NOME (instância nomeada) -->
+  <rule id="100301" level="2">
+    <if_sid>61061</if_sid>
+    <field name="win.system.providerName" type="pcre2">^MSSQL(SERVER|\$.+)$</field>
+    <field name="win.system.severityValue">^ERROR$</field>
+    <description>Múltiplos erros no SQL Server ($(win.system.providerName))</description>
+    <group>mssql,error,</group>
+    <options>no_full_log</options>
+  </rule>
+
+  <rule id="100302" level="2">
+    <if_sid>60602</if_sid>
+    <field name="win.system.providerName" type="pcre2">^MSSQL(SERVER|\$.+)$</field>
+    <field name="win.system.severityValue">^ERROR$</field>
+    <description>Erro no SQL Server ($(win.system.providerName))</description>
+    <group>mssql,error,</group>
+    <options>no_full_log</options>
+  </rule>
+
+  <!-- Desktop Window Manager encerrado (comum no logoff) -->
+  <rule id="100303" level="1">
+    <if_sid>60773</if_sid>
+    <field name="win.system.eventID">^9009$</field>
+    <description>Desktop Window Manager encerrado com código 0xd00002fe (normal no logoff)</description>
+    <group>info,desktop,</group>
+    <options>no_full_log</options>
+  </rule>
+
+  <!-- CONFIRMAR: o 9009 é do Desktop Window Manager; o agendamento do
+       Software Protection costuma ser o evento 16384 -->
+  <rule id="100304" level="2">
+    <if_sid>60642</if_sid>
+    <field name="win.system.eventID">^9009$</field>
+    <description>Serviço de proteção de software agendado com sucesso</description>
+    <group>infos,</group>
+    <options>no_full_log</options>
+  </rule>
+
+</group>

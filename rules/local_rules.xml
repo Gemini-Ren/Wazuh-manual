@@ -1,0 +1,773 @@
+<!--
+===============================================================================
+Arquivo: local_rules.xml
+Descrição: Arquivo principal das regras customizadas do Wazuh.
+Contém as regras de autenticação do Windows (logon, logoff, RDP, e-mail,
+usuários críticos) e documenta todo o conjunto de regras customizadas:
+arquivos, faixas de IDs, dependências e ordem de carregamento.
+
+Mantido por: <sua equipe de segurança>
+Organização: <sua organização>
+
+Data de criação: 30/07/2025
+Versão 1: 29/04/2026
+Versão 2: 05/11/2026 - revisão geral de todos os arquivos: padronização de
+          nomes e cabeçalhos, correção de regras que não disparavam,
+          ajuste de níveis, pais nativos confirmados no ruleset 4.14.5,
+          reorganização por faixa de IDs e IDs em sequência em cada arquivo
+Última atualização: 05/11/2026
+Versão do Wazuh: 4.14
+
+Tecnologias monitoradas:
+- Wazuh (SIEM/XDR) e o próprio servidor Wazuh Manager (Linux)
+- Windows Event Logs (Security, System, Application) e Sysmon
+- Active Directory, Exchange (OWA) e MS SQL Server
+- Kaspersky Endpoint Security
+- Suricata (IDS), pfSense (firewall) e Squid (proxy)
+- Cisco ASA e OpenVPN (VPN)
+- Forcepoint (DLP) e Modat.io (inteligência de ameaças)
+- Monitoramento de CPU, RAM e disco, backup e softwares em fim de vida (EOL)
+
+Objetivo:
+Definir regras personalizadas para melhorar a detecção de ameaças,
+reduzir falsos positivos e aumentar a visibilidade de eventos críticos.
+
+Escopo:
+- Autenticação e gestão de identidades (Windows, AD, VPN, SQL, SSH, e-mail)
+- Monitoramento de integridade de arquivos (FIM) e registro
+- Detecção de persistência, execução remota e movimento lateral
+- Correlação de eventos de segurança (força bruta, spraying, horário)
+- Detecção de ataques e de malware
+- Monitoramento de desempenho e disponibilidade
+- Filtragem de eventos ruidosos
+
+Referências:
+- MITRE ATT&CK Framework
+- ISO/IEC 27001
+- ISO/IEC 27005
+- ISO/IEC 31000
+
+_______________________________________________________________________________
+ESTRUTURA DOS ARQUIVOS (/var/ossec/etc/rules/)
+O Wazuh carrega os arquivos em ordem alfabética. Os prefixos numéricos seguem
+a ordem das faixas de IDs, e este local_rules.xml é carregado POR ÚLTIMO.
+_______________________________________________________________________________
+Arquivo                         Faixa de IDs     Conteúdo
+901-iam-rules.xml                100200 - 100299  Gestão de identidades no AD: usuários, contas
+                                                 de máquina, grupos, bloqueios e atributos
+                                                 sensíveis (SPN, UAC, UPN)
+902-info-win-rules.xml           100300 - 100399  Eventos informativos do Windows e do SQL
+                                                 Server (VSS, MSSQL, DWM)
+903-erros-win-rules.xml          100600 - 100699  Erros do System: alertas TLS/Schannel,
+                                                 Netlogon, GPO, serviços e ataque de senha
+                                                 na conta Administrador (12294)
+904-cisco-asa-rules.xml          100700 - 100799  VPN Cisco ASA: conexões, desconexões, erros,
+                                                 falhas de login e eventos fora do horário
+905-mssql-rules.xml              100800 - 100899  Falhas de login no SQL Server, força bruta e
+                                                 falhas fora do expediente
+906-openvpn-rules.xml            100900 - 100999  VPN OpenVPN: logon, logoff, timeout, falhas,
+                                                 múltiplas falhas e eventos fora do horário
+907-echos-system-rules.xml       101000 - 101199  Silenciamento de erros conhecidos do Windows,
+                                                 serviços, instalações e logoff de usuários
+                                                 críticos
+908-abuse-rules.xml              101200 - 101299  IPs externos no Suricata, scans do Modat.io e
+                                                 rebaixamento da nativa 87702 do firewall
+local_rules.xml (este arquivo)  101300 - 101499  Diversos e usuários críticos (ver abaixo)
+909-false-positive-rules.xml     101500 - 101599  Falsos positivos e saúde do agente (fila cheia)
+910-backup-rules.xml             101600 - 101699  Backups com sucesso e falhas
+911-temp-rules.xml               101700 - 101799  Regras temporárias de teste (svc_sql_exemplo,
+                                                 ASA, registro)
+912-kaspersky-rules.xml          101800 - 101899  Kaspersky: ataques de rede, malware, bloqueios,
+                                                 KSN e prevenção de intrusão
+913-forcepoint-rules.xml         101900 - 101999  DLP Forcepoint: violações e movimentações de
+                                                 dados permitidas e bloqueadas
+914-audit-rules.xml              102000 - 102099  Auditoria do firewall: configuração, WebGUI,
+                                                 Squid e LDAP
+915-squid-rules.xml              102100 - 102199  Proxy Squid: acessos e sites restritos (adulto
+                                                 e apostas)
+916-suricata-rules.xml           102200 - 102299  Anomalias de protocolo do Suricata
+917-eol-rules.xml                102300 - 102399  Softwares e sistemas operacionais em fim de vida
+918-pfsense-filter-rules.xml     102400 - 102499  Silenciamento do filtro do pfSense (bloqueios,
+                                                 liberações e NAT) e IP com múltiplos bloqueios
+919-cpu-usage-rules.xml          102500 - 102599  Uso de CPU no Windows e uso alto ou crítico
+                                                 sustentado (3 coletas seguidas, com e-mail)
+920-ram-usage-rules.xml          102600 - 102699  Uso de RAM no Windows
+921-hdd-rules.xml                102700 - 102799  Uso de disco no Windows (e-mail diário às 8h
+                                                 acima de 90%, imediato em 100%)
+922-hdd-legacy-rules.xml         102800 - 102899  Uso de disco no Windows legado (mesmo critério
+                                                 do 21)
+923-manage-wazuh-rules.xml       102900 - 102999  Acessos e administração do Wazuh Manager (SSH,
+                                                 sudo, su, usuários) e força bruta SSH
+                                                 (por IP, distribuída e seguida de login)
+924-monit-power-rules.xml        103000 - 103099  Desligamentos manuais (1074) e inesperados (6008)
+925-adm-rules.xml                103100 - 103199  Administração/TI do Windows: downloads, FIM, RDP,
+                                                 senha incorreta, PsExec e movimento lateral,
+                                                 criação de processos (LOLBins, masquerading),
+                                                 logon em cache e desbloqueio
+                                                 (inclui overwrite da nativa 67027)
+
+Faixas deste arquivo (local_rules.xml):
+100000 - 100099  Autenticação: logon e logoff do Windows e do e-mail (OWA)
+100100 - 100199  Acessos e tentativas fora do horário comercial (22h às 8h)
+100400 - 100499  Logins RDP e falhas de login internas e externas, força bruta
+100500 - 100599  Tipos de logon do Windows (local, lote, Kerberos, NTLM)
+As regras "pega-tudo" ficam no fim do arquivo e usam os IDs 100010 a
+100015 e 100508 (continuação das faixas 100000 e 100500).
+101300 - 101399  Diversos: ruídos de serviços e mudanças na política de auditoria
+101400 - 101499  Usuários com direito administrativo (críticos)
+
+Faixas livres: 103200 em diante.
+
+_______________________________________________________________________________
+DEPENDÊNCIAS
+_______________________________________________________________________________
+Listas CDB (/var/ossec/etc/lists/, registradas no ossec.conf):
+- critical-users      usuários críticos (01, 07 e este arquivo)
+- ip-sec-list         IPs da equipe de cybersecurity (15 e 23)
+- modat-range         IPs de scan do Modat.io (08)
+- white-list-sites    sites liberados no proxy (15)
+- adult-sites         sites de conteúdo adulto (15)
+- bet-sites           sites de apostas (15)
+- kernel-power        IDs de eventos de energia (24)
+- lolbins_vigiados    ferramentas nativas usadas em ataques (25)
+
+Decoders customizados: audit-fw, custom-cisco-asa-*, custom-asa-*,
+custom-openvpn, forcepoint-dlp, forcepoint-dlp-alerts, kaspersky-base,
+squid-cd-web, windows_cpu_usage, windows_ram_usage, windows_hdd_usage,
+windows_hdd_legacy_usage.
+
+Dependências entre arquivos (o pai precisa carregar antes do filho):
+- 911 usa a 100204 do 901 (bloqueio de conta)
+- 924 usa a 100622 do 903 (erros do System) para o desligamento inesperado
+- 925 usa a 101009 do 907 (serviço criado) como pai da 103113
+- Este arquivo usa as regras 103109 e 103110 do 925 como pai das falhas de
+  senha e de usuário inexistente (internas e externas)
+- O desbloqueio de estação (4624 tipo 7) é tratado no 925 (103130 a 103133)
+
+Pais nativos mais usados (ruleset 4.14.5):
+- 60106 logon (4624); 67022 logon que não é de rede nem de serviço
+- 60137 logoff (4634) de rede; 67023 logoff dos demais tipos
+- 60122 falha de logon (4625); 67027 criação de processo (4688)
+- 61100 / 61101 / 61102 / 61103 eventos do System: informativo, aviso,
+  erro e crítico; 61138 serviço criado (7045); 67018 desligamento (1074)
+
+_______________________________________________________________________________
+OBSERVAÇÕES
+_______________________________________________________________________________
+- Alterações devem ser versionadas
+- Evitar regras que gerem alto volume de eventos desnecessários
+- Priorizar detecções críticas (persistência, execução remota, privilege escalation)
+- Regras irmãs (mesmo pai) são avaliadas na ordem em que aparecem: a mais
+  específica deve vir antes da mais genérica
+- Regras "pega-tudo" (filhas sem condição) impedem que regras irmãs
+  carregadas depois sejam alcançadas; por isso as deste arquivo ficam na
+  última seção, e este arquivo é carregado por último
+- Não referenciar IDs deste arquivo em outros arquivos (if_sid ou
+  if_matched_sid): ele carrega por último e o Wazuh não encontraria o pai
+- Eventos que o Wazuh pode classificar em mais de uma regra nativa usam
+  if_sid com lista (ex.: 60137, 67023 para o logoff 4634), sempre com o
+  eventID explícito para limitar o alcance da regra
+- Campos do Windows usam a primeira letra minúscula (targetUserName,
+  ipAddress, logonType) e caminhos chegam com barras invertidas duplicadas
+- Expediente: 8h às 22h. Regras "fora do horário" usam 22:00 - 08:00
+- Os arquivos precisam terminar em .xml; arquivos sem a extensão são
+  ignorados pelo Wazuh sem aviso
+- O Wazuh ordena pelo NOME os arquivos de regras de todas as pastas juntas
+  (ruleset nativo e etc/rules). O ruleset nativo usa os prefixos 0010 a
+  0999; por isso os arquivos customizados usam o prefixo 9NN, que carrega
+  depois de todo o ruleset nativo, e o local_rules.xml vem por último
+- Uma regra só pode usar if_sid, if_matched_sid ou if_matched_group de uma
+  regra ou grupo carregado ANTES dela (no mesmo arquivo ou em outro)
+- Os IDs seguem a ordem em que as regras aparecem em cada arquivo
+- O Wazuh envia e-mail de todo alerta a partir do nível 12
+  (email_alert_level); níveis 10 e 11 são usados para alertas que devem
+  aparecer com destaque sem gerar e-mail a cada ocorrência
+- Horários (<time>) usam o fuso do servidor Wazuh Manager
+- Redes internas: faixas privadas RFC 1918 (10/8, 172.16/12, 192.168/16); ajuste ao seu ambiente
+
+===============================================================================
+-->
+
+<group name="local,windows,authentication,">
+
+<!-- ===========================================================================
+Categoria: Autenticação - Logon e Logoff (Windows e e-mail)
+Descrição: Regras de autenticação de usuários no Windows e no e-mail (OWA)
+
+Faixa de IDs:
+100000 - 100099
+============================================================================ -->
+
+  <rule id="100000" level="2">
+    <if_sid>60137, 67023</if_sid>
+    <field name="win.system.eventID">^4634$</field>
+    <field name="win.eventdata.targetUserName" type="pcre2">\$$</field>
+    <description>Logoff de conta de máquina $(win.eventdata.targetUserName)</description>
+    <group>windows_security,logoff,</group>
+    <options>no_full_log</options>
+  </rule>
+
+  <!-- ===== E-mail (OWA/IIS) ===== -->
+
+  <!-- Falha de login no e-mail a partir de IP externo -->
+  <rule id="100001" level="2">
+    <if_sid>60122</if_sid>
+    <field name="win.eventdata.processName" type="pcre2">(?i)\\w3wp\.exe$</field>
+    <field name="win.eventdata.logonType">^8$</field>
+    <field name="win.eventdata.ipAddress" type="pcre2">^(?!10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.)</field>
+    <description>[EXTERNO] Falha de login no e-mail do usuário $(win.eventdata.targetUserName) a partir de $(win.eventdata.ipAddress)</description>
+    <group>windows_security,authentication_failed,</group>
+  </rule>
+
+  <!-- Correlações das falhas externas: fora do horário vem primeiro -->
+  <rule id="100002" level="12" frequency="3" timeframe="60">
+    <if_matched_sid>100001</if_matched_sid>
+    <time>22:00 - 08:00</time>
+    <description>[EXTERNO] Múltiplas falhas de login no e-mail fora do horário comercial (22h às 8h)</description>
+    <group>windows_security,authentication_failed,</group>
+    <options>no_full_log</options>
+  </rule>
+
+  <rule id="100003" level="10" frequency="10" timeframe="300">
+    <if_matched_sid>100001</if_matched_sid>
+    <same_field>win.eventdata.ipAddress</same_field>
+    <description>[EXTERNO] Possível força bruta no e-mail: múltiplas falhas de login a partir do IP $(win.eventdata.ipAddress)</description>
+    <group>windows_security,authentication_failed,bruteforce,</group>
+    <mitre>
+      <id>T1110</id>
+    </mitre>
+    <options>no_full_log</options>
+  </rule>
+
+  <!-- Login no e-mail a partir de IP externo (o acesso externo é permitido;
+       fora do horário sobe para nível 10 na 100103) -->
+  <rule id="100004" level="5">
+    <if_sid>60106, 60200, 67022</if_sid>
+    <field name="win.system.eventID">^4624$</field>
+    <field name="win.eventdata.logonType">^8$</field>
+    <field name="win.eventdata.processName" type="pcre2">(?i)\\w3wp\.exe$</field>
+    <field name="win.eventdata.ipAddress" type="pcre2">^(?!10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.)</field>
+    <description>[EXTERNO] Login no e-mail bem-sucedido do usuário $(win.eventdata.targetUserName) a partir de $(win.eventdata.ipAddress)</description>
+    <group>windows_security,authentication_success,</group>
+  </rule>
+
+  <!-- ===== Logons de sistema e serviços ===== -->
+
+  <rule id="100005" level="2">
+    <if_sid>60106</if_sid>
+    <field name="win.eventdata.processId">^0x0$</field>
+    <field name="win.eventdata.logonType">^3$</field>
+    <description>Login bem-sucedido (processo do sistema)</description>
+    <group>login,authentication_success,</group>
+    <options>no_full_log</options>
+  </rule>
+
+  <rule id="100006" level="3">
+    <if_sid>60106, 67022</if_sid>
+    <field name="win.system.eventID">^4624$</field>
+    <field name="win.eventdata.processName" type="pcre2">(?i)\\sqlservr\.exe$</field>
+    <description>Login bem-sucedido no MS SQL Server em $(win.system.computer)</description>
+    <group>mssql,authentication_success,</group>
+    <options>no_full_log</options>
+  </rule>
+
+  <rule id="100007" level="0">
+    <if_sid>60106</if_sid>
+    <field name="win.eventdata.logonType">^5$</field>
+    <description>Logon de serviço: usuário $(win.eventdata.targetUserName) via processo $(win.eventdata.processName)</description>
+    <group>authentication_success,service_logon,</group>
+  </rule>
+
+  <rule id="100008" level="2">
+    <if_sid>60106, 60200, 67022</if_sid>
+    <field name="win.system.eventID">^4624$</field>
+    <field name="win.eventdata.targetUserName" type="pcre2">(?i)svc_helpdesk</field>
+    <field name="win.eventdata.logonType">^8$</field>
+    <description>Login do serviço svc_helpdesk detectado</description>
+    <group>svc_helpdesk,login,</group>
+    <options>no_full_log</options>
+  </rule>
+
+  <rule id="100009" level="2">
+    <if_sid>60137, 67023</if_sid>
+    <field name="win.system.eventID">^4634$</field>
+    <field name="win.eventdata.logonType">^5$</field>
+    <field name="win.eventdata.targetUserName" type="pcre2">(?i)^(ksnproxy|svc_sql_exemplo)$</field>
+    <description>Logon de serviço desconectado: usuário $(win.eventdata.targetUserName)</description>
+    <group>authentication_success,service_logon,</group>
+  </rule>
+
+<!-- ===========================================================================
+Categoria: Acessos e tentativas fora do horário comercial
+Descrição: Regras de autenticação de usuários entre 22h e 8h
+
+Faixa de IDs:
+100100 - 100199
+============================================================================ -->
+
+  <!-- Avaliadas antes das regras de RDP 100400/100408 (mesmo pai 92653) -->
+  <rule id="100100" level="10">
+    <if_sid>92653, 67022</if_sid>
+    <time>22:00 - 08:00</time>
+    <field name="win.system.eventID">^4624$</field>
+    <field name="win.eventdata.logonType">^10$</field>
+    <field name="win.eventdata.logonProcessName" type="pcre2">^(User32|TermService|NtLmSsp)\s*$</field>
+    <field name="win.eventdata.ipAddress" type="pcre2">^(10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.)</field>
+    <description>[RDP INTERNO] Login de $(win.eventdata.targetUserName) a partir de $(win.eventdata.ipAddress) fora do horário comercial (22h às 8h)</description>
+    <group>rdp,login,</group>
+    <options>no_full_log</options>
+  </rule>
+
+  <rule id="100101" level="10">
+    <if_sid>92653, 67022</if_sid>
+    <time>22:00 - 08:00</time>
+    <field name="win.system.eventID">^4624$</field>
+    <field name="win.eventdata.logonType">^10$</field>
+    <field name="win.eventdata.logonProcessName" type="pcre2">^(User32|TermService|NtLmSsp)\s*$</field>
+    <field name="win.eventdata.ipAddress" type="pcre2">^(?!10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.)</field>
+    <description>[RDP EXTERNO] Login de $(win.eventdata.targetUserName) a partir de $(win.eventdata.ipAddress) fora do horário comercial (22h às 8h)</description>
+    <group>rdp,authentication_success,external,</group>
+    <options>no_full_log</options>
+  </rule>
+
+  <rule id="100102" level="14">
+    <if_sid>100006</if_sid>
+    <time>22:00 - 08:00</time>
+    <description>Login bem-sucedido no MS SQL Server em $(win.system.computer) fora do horário comercial (22h às 8h)</description>
+    <group>mssql,authentication_success,</group>
+    <options>no_full_log</options>
+  </rule>
+
+  <rule id="100103" level="10">
+    <if_sid>100004</if_sid>
+    <time>22:00 - 08:00</time>
+    <description>[EXTERNO] Login no e-mail de $(win.eventdata.targetUserName) a partir de $(win.eventdata.ipAddress) fora do horário comercial (22h às 8h)</description>
+    <group>windows_security,authentication_success,</group>
+  </rule>
+
+<!-- ===========================================================================
+Categoria: Detecção de logins RDP e falhas de login
+Descrição: Logins RDP internos e externos, falhas de senha e de usuário
+inexistente, contas bloqueadas e força bruta
+
+Faixa de IDs:
+100400 - 100499
+============================================================================ -->
+
+  <!-- ===== Login e logoff RDP ===== -->
+
+  <rule id="100400" level="5">
+    <if_sid>92653, 67022</if_sid>
+    <field name="win.system.eventID">^4624$</field>
+    <field name="win.eventdata.logonType">^10$</field>
+    <field name="win.eventdata.logonProcessName" type="pcre2">^(User32|TermService|NtLmSsp)\s*$</field>
+    <field name="win.eventdata.ipAddress" type="pcre2">^(10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.)</field>
+    <description>Login RDP interno bem-sucedido de $(win.eventdata.targetUserName) a partir de $(win.eventdata.ipAddress)</description>
+    <group>rdp,authentication_success,internal,</group>
+    <options>no_full_log</options>
+  </rule>
+
+  <rule id="100401" level="10">
+    <if_sid>92653, 67022</if_sid>
+    <field name="win.system.eventID">^4624$</field>
+    <field name="win.eventdata.logonType">^10$</field>
+    <field name="win.eventdata.logonProcessName" type="pcre2">^(User32|TermService|NtLmSsp)\s*$</field>
+    <field name="win.eventdata.ipAddress" type="pcre2">^(?!10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.)</field>
+    <description>Login RDP EXTERNO bem-sucedido de $(win.eventdata.targetUserName) a partir de $(win.eventdata.ipAddress)</description>
+    <group>rdp,authentication_success,external,</group>
+    <options>no_full_log</options>
+  </rule>
+
+  <rule id="100402" level="5">
+    <if_sid>60137, 67023</if_sid>
+    <field name="win.system.eventID">^4634$</field>
+    <field name="win.eventdata.logonType">^10$</field>
+    <description>Logoff RDP de $(win.eventdata.targetUserName)</description>
+    <group>rdp,logoff,</group>
+    <options>no_full_log</options>
+  </rule>
+
+  <!-- ===== Falhas de login ===== -->
+
+  <rule id="100403" level="5">
+    <if_sid>60122</if_sid>
+    <field name="win.eventdata.logonType">^10$</field>
+    <field name="win.eventdata.ipAddress" type="pcre2">^(10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.)</field>
+    <description>[RDP] Falha de login do usuário $(win.eventdata.targetUserName) a partir de $(win.eventdata.ipAddress)</description>
+    <group>rdp,authentication_failed,internal,</group>
+    <options>no_full_log</options>
+  </rule>
+
+  <!-- Senha incorreta (filhas da 103109 do 925-adm-rules.xml: 4625, tipo 3, subStatus 0xc000006a) -->
+  <rule id="100404" level="5">
+    <if_sid>103109</if_sid>
+    <field name="win.eventdata.logonProcessName" type="pcre2">^NtLmSsp\s*$</field>
+    <field name="win.eventdata.ipAddress" type="pcre2">^(10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.)</field>
+    <description>Falha de login RDP/NTLM interno: senha incorreta para $(win.eventdata.targetUserName) a partir de $(win.eventdata.ipAddress)</description>
+    <group>rdp,authentication_failed,internal,</group>
+    <options>no_full_log</options>
+  </rule>
+
+  <rule id="100405" level="13">
+    <if_sid>103109</if_sid>
+    <field name="win.eventdata.logonProcessName" type="pcre2">^NtLmSsp\s*$</field>
+    <field name="win.eventdata.ipAddress" type="pcre2">^(?!10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.)</field>
+    <description>Falha de login externa: senha incorreta para $(win.eventdata.targetUserName) a partir de $(win.eventdata.ipAddress)</description>
+    <group>rdp,authentication_failed,external,</group>
+    <options>no_full_log</options>
+  </rule>
+
+  <!-- Usuário inexistente (filha da 103110 do 925-adm-rules.xml: subStatus 0xc0000064) -->
+  <rule id="100406" level="6">
+    <if_sid>103110</if_sid>
+    <field name="win.eventdata.logonType">^3$</field>
+    <field name="win.eventdata.logonProcessName" type="pcre2">^NtLmSsp\s*$</field>
+    <field name="win.eventdata.ipAddress" type="pcre2">^(10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.)</field>
+    <description>Falha de login interno: usuário desconhecido $(win.eventdata.targetUserName) a partir de $(win.eventdata.ipAddress)</description>
+    <group>rdp,authentication_failed,internal,</group>
+    <options>no_full_log</options>
+  </rule>
+
+  <!-- Senha expirada (status 0xc000006e, subStatus 0xc0000071) -->
+  <rule id="100407" level="3">
+    <if_sid>60122</if_sid>
+    <field name="win.eventdata.logonType">^3$</field>
+    <field name="win.eventdata.status" type="pcre2">(?i)^0xc000006e$</field>
+    <field name="win.eventdata.subStatus" type="pcre2">(?i)^0xc0000071$</field>
+    <field name="win.eventdata.logonProcessName" type="pcre2">^NtLmSsp\s*$</field>
+    <field name="win.eventdata.ipAddress" type="pcre2">^(10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.)</field>
+    <description>Falha de login interno: senha expirada do usuário $(win.eventdata.targetUserName) a partir de $(win.eventdata.ipAddress)</description>
+    <group>rdp,authentication_failed,internal,</group>
+    <options>no_full_log</options>
+  </rule>
+
+  <!-- Tentativa em conta bloqueada (status 0xc0000234) a partir de IP externo -->
+  <rule id="100408" level="13">
+    <if_sid>60122</if_sid>
+    <field name="win.eventdata.logonType">^3$</field>
+    <field name="win.eventdata.status" type="pcre2">(?i)^0xc0000234$</field>
+    <field name="win.eventdata.logonProcessName" type="pcre2">^NtLmSsp\s*$</field>
+    <field name="win.eventdata.ipAddress" type="pcre2">^(?!10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.)</field>
+    <description>Tentativa de login RDP/NTLM externo em conta bloqueada: usuário $(win.eventdata.targetUserName) a partir de $(win.eventdata.ipAddress)</description>
+    <group>rdp,authentication_failed,external,</group>
+    <options>no_full_log</options>
+  </rule>
+
+  <!-- ===== Força bruta (a mais grave vem primeiro) ===== -->
+
+  <rule id="100409" level="12" frequency="11" timeframe="300">
+    <if_matched_sid>100404</if_matched_sid>
+    <same_field>win.eventdata.ipAddress</same_field>
+    <description>FORÇA BRUTA DETECTADA: mais de 10 falhas RDP/NTLM a partir do IP interno $(win.eventdata.ipAddress)</description>
+    <group>rdp,bruteforce,internal,incident,</group>
+    <mitre>
+      <id>T1110.001</id>
+    </mitre>
+    <options>no_full_log</options>
+  </rule>
+
+  <rule id="100410" level="10" frequency="5" timeframe="300">
+    <if_matched_sid>100404</if_matched_sid>
+    <same_field>win.eventdata.ipAddress</same_field>
+    <description>Múltiplas falhas de login a partir do IP interno $(win.eventdata.ipAddress)</description>
+    <group>rdp,bruteforce,internal,</group>
+    <mitre>
+      <id>T1110.001</id>
+    </mitre>
+    <options>no_full_log</options>
+  </rule>
+
+  <rule id="100411" level="12" frequency="11" timeframe="300">
+    <if_matched_sid>100405</if_matched_sid>
+    <same_field>win.eventdata.ipAddress</same_field>
+    <description>FORÇA BRUTA DETECTADA: mais de 10 falhas RDP/NTLM a partir do IP externo $(win.eventdata.ipAddress)</description>
+    <group>rdp,bruteforce,external,incident,</group>
+    <mitre>
+      <id>T1110.001</id>
+    </mitre>
+    <options>no_full_log</options>
+  </rule>
+
+  <rule id="100412" level="10" frequency="5" timeframe="300">
+    <if_matched_sid>100405</if_matched_sid>
+    <same_field>win.eventdata.ipAddress</same_field>
+    <description>Possível força bruta externa: múltiplas falhas a partir do IP $(win.eventdata.ipAddress)</description>
+    <group>rdp,bruteforce,external,</group>
+    <mitre>
+      <id>T1110.001</id>
+    </mitre>
+    <options>no_full_log</options>
+  </rule>
+
+<!-- ===========================================================================
+Categoria: Usuários com direito administrativo (críticos)
+Descrição: Eventos de usuários com permissão administrativa (lista
+critical-users). Esta seção fica antes da de tipos de logon para que as
+regras de usuários críticos sejam avaliadas antes das regras gerais com o
+mesmo pai.
+
+Faixa de IDs:
+101400 - 101499
+============================================================================ -->
+
+  <rule id="101400" level="2">
+    <if_sid>60137, 67023</if_sid>
+    <field name="win.system.eventID">^4634$</field>
+    <list field="win.eventdata.targetUserName" lookup="match_key">etc/lists/critical-users</list>
+    <description>Usuário crítico $(win.eventdata.targetUserName) fez logoff</description>
+    <group>critical,logoff,</group>
+    <options>no_full_log</options>
+  </rule>
+
+  <!-- RDP: fora do horário vem antes da regra sem horário -->
+  <rule id="101401" level="8">
+    <if_sid>100400</if_sid>
+    <time>22:00 - 08:00</time>
+    <list field="win.eventdata.targetUserName" lookup="match_key">etc/lists/critical-users</list>
+    <description>[RDP FORA DO HORÁRIO COMERCIAL] Usuário crítico $(win.eventdata.targetUserName) realizou login a partir de $(win.eventdata.ipAddress)</description>
+    <group>critical,rdp,</group>
+  </rule>
+
+  <rule id="101402" level="8">
+    <if_sid>100400</if_sid>
+    <list field="win.eventdata.targetUserName" lookup="match_key">etc/lists/critical-users</list>
+    <description>[RDP] Usuário crítico $(win.eventdata.targetUserName) realizou login a partir de $(win.eventdata.ipAddress)</description>
+    <group>critical,rdp,</group>
+  </rule>
+
+  <rule id="101403" level="8">
+    <if_sid>100403</if_sid>
+    <time>22:00 - 08:00</time>
+    <list field="win.eventdata.targetUserName" lookup="match_key">etc/lists/critical-users</list>
+    <description>[RDP FORA DO HORÁRIO COMERCIAL] Usuário crítico $(win.eventdata.targetUserName) falhou no login a partir de $(win.eventdata.ipAddress)</description>
+    <group>critical,rdp,authentication_failed,</group>
+  </rule>
+
+  <rule id="101404" level="8">
+    <if_sid>100403</if_sid>
+    <list field="win.eventdata.targetUserName" lookup="match_key">etc/lists/critical-users</list>
+    <description>[RDP] Usuário crítico $(win.eventdata.targetUserName) falhou no login a partir de $(win.eventdata.ipAddress)</description>
+    <group>critical,rdp,authentication_failed,</group>
+  </rule>
+
+  <rule id="101405" level="8">
+    <if_sid>60106, 60118, 67022</if_sid>
+    <field name="win.system.eventID">^4624$</field>
+    <field name="win.eventdata.logonType">^2$</field>
+    <list field="win.eventdata.targetUserName" lookup="match_key">etc/lists/critical-users</list>
+    <description>[Usuário crítico] Login local bem-sucedido de $(win.eventdata.targetUserName) na estação $(win.eventdata.workstationName)</description>
+    <group>critical,authentication_success,local_logon,</group>
+  </rule>
+
+  <rule id="101406" level="8">
+    <if_sid>60122</if_sid>
+    <field name="win.eventdata.logonType">^2$</field>
+    <list field="win.eventdata.targetUserName" lookup="match_key">etc/lists/critical-users</list>
+    <description>[Usuário crítico] Falha de login local de $(win.eventdata.targetUserName) na estação $(win.eventdata.workstationName)</description>
+    <group>critical,authentication_failed,local_logon,</group>
+  </rule>
+
+<!-- ===========================================================================
+Categoria: Tipos de logon do Windows
+Descrição: Logon e logoff por tipo (local, lote, Kerberos, NTLM).
+O desbloqueio de estação (tipo 7) é tratado no 925-adm-rules.xml.
+
+Faixa de IDs:
+100500 - 100599
+============================================================================ -->
+
+  <!-- Login e logoff local (tipo 2) -->
+  <rule id="100500" level="5">
+    <if_sid>60106, 60118, 67022</if_sid>
+    <field name="win.system.eventID">^4624$</field>
+    <field name="win.eventdata.logonType">^2$</field>
+    <description>Login local bem-sucedido de $(win.eventdata.targetUserName) pelo processo $(win.eventdata.processName) na estação $(win.eventdata.workstationName)</description>
+    <group>authentication_success,local_logon,</group>
+  </rule>
+
+  <rule id="100501" level="3">
+    <if_sid>60137, 67023</if_sid>
+    <field name="win.system.eventID">^4634$</field>
+    <field name="win.eventdata.logonType">^2$</field>
+    <description>Logoff local de $(win.eventdata.targetUserName)</description>
+    <group>authentication,local_logoff,</group>
+  </rule>
+
+  <!-- Logon e logoff em lote (tipo 4) -->
+  <rule id="100502" level="0">
+    <if_sid>60106, 67022</if_sid>
+    <field name="win.system.eventID">^4624$</field>
+    <field name="win.eventdata.logonType">^4$</field>
+    <description>Login em lote bem-sucedido de $(win.eventdata.targetUserName) em $(win.system.computer)</description>
+    <group>authentication_success,batch_logon,</group>
+  </rule>
+
+  <rule id="100503" level="0">
+    <if_sid>60137, 67023</if_sid>
+    <field name="win.system.eventID">^4634$</field>
+    <field name="win.eventdata.logonType">^4$</field>
+    <description>Logoff de lote de $(win.eventdata.targetUserName) em $(win.system.computer)</description>
+    <group>batch_logon,</group>
+  </rule>
+
+  <!-- Encerramento de sessão desbloqueada (4634 tipo 7) -->
+  <rule id="100504" level="4">
+    <if_sid>60137, 67023</if_sid>
+    <field name="win.system.eventID">^4634$</field>
+    <field name="win.eventdata.logonType">^7$</field>
+    <description>A conta $(win.eventdata.targetUserName) encerrou a sessão desbloqueada</description>
+    <group>session,logoff,</group>
+  </rule>
+
+  <!-- Regras para estudo de falsos positivos -->
+  <rule id="100505" level="0">
+    <if_sid>60106</if_sid>
+    <field name="win.eventdata.logonType">^3$</field>
+    <field name="win.eventdata.logonProcessName" type="pcre2">^Kerberos\s*$</field>
+    <description>Login de rede via Kerberos</description>
+    <group>authentication_success,service_logon,</group>
+  </rule>
+
+  <!-- 92657 (logon remoto NTLM): silencia só os internos; os externos continuam alertando -->
+  <rule id="100506" level="0">
+    <if_sid>92657</if_sid>
+    <field name="win.eventdata.logonType">^3$</field>
+    <field name="win.eventdata.authenticationPackageName">^NTLM</field>
+    <field name="win.eventdata.logonProcessName" type="pcre2">^NtLmSsp\s*$</field>
+    <field name="win.eventdata.ipAddress" type="pcre2">^(10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.)</field>
+    <description>Login NTLM interno de $(win.eventdata.targetUserName) na estação $(win.eventdata.workstationName) a partir de $(win.eventdata.ipAddress)</description>
+    <group>authentication_success,service_logon,</group>
+  </rule>
+
+  <rule id="100507" level="0">
+    <if_sid>60106</if_sid>
+    <field name="win.eventdata.logonType">^3$</field>
+    <field name="win.eventdata.authenticationPackageName">^NTLM</field>
+    <field name="win.eventdata.logonProcessName" type="pcre2">^NtLmSsp\s*$</field>
+    <description>Login de rede via NTLM de $(win.eventdata.targetUserName)</description>
+    <group>authentication_success,service_logon,</group>
+  </rule>
+
+<!-- ===========================================================================
+Categoria: Diversos
+Descrição: Ruídos de serviços (Vipre, Exchange Edge, SolarWinds, registro)
+e mudanças na política de auditoria do Windows
+
+Faixa de IDs:
+101300 - 101399
+============================================================================ -->
+
+  <rule id="101300" level="2">
+    <if_sid>90516</if_sid>
+    <description>Vipre verificando atualização</description>
+    <group>windows_checks,</group>
+    <options>no_full_log</options>
+  </rule>
+
+  <rule id="101301" level="2">
+    <if_sid>60106, 60200, 67022</if_sid>
+    <field name="win.system.eventID">^4624$</field>
+    <field name="win.eventdata.logonType">^8$</field>
+    <field name="win.eventdata.processName" type="pcre2">(?i)\\EdgeTransport\.exe$</field>
+    <description>Logon do serviço Exchange Edge Transport</description>
+    <options>no_full_log</options>
+  </rule>
+
+  <rule id="101302" level="3">
+    <if_sid>60137, 67023</if_sid>
+    <field name="win.system.eventID">^4634$</field>
+    <field name="win.eventdata.logonType">^9$</field>
+    <field name="win.eventdata.processName" type="pcre2">(?i)\\SWJobEngineWorker2\.exe$</field>
+    <description>Logoff do SolarWinds</description>
+    <options>no_full_log</options>
+  </rule>
+
+  <rule id="101303" level="2">
+    <if_sid>60790</if_sid>
+    <description>O registro está sendo usado por outra aplicação</description>
+    <options>no_full_log</options>
+  </rule>
+
+  <!-- Política de auditoria alterada por um usuário (e não pelo sistema) -->
+  <rule id="101304" level="8">
+    <if_sid>60112</if_sid>
+    <field name="win.eventdata.subjectUserName" type="pcre2">^[^$]+$</field>
+    <description>Política de auditoria do Windows alterada pelo usuário $(win.eventdata.subjectUserName) em $(win.system.computer)</description>
+    <mitre>
+      <id>T1562.002</id>
+    </mitre>
+    <options>no_full_log</options>
+  </rule>
+
+  <!-- Demais alterações (sistema, GPO, agente Wazuh reaplicando o auditpol) -->
+  <rule id="101305" level="2">
+    <if_sid>60112</if_sid>
+    <description>Mudança na política de auditoria do Windows pelo sistema</description>
+    <options>no_full_log</options>
+  </rule>
+
+<!-- ===========================================================================
+Regras gerais ("pega-tudo")
+Descrição: Filhas sem condição extra que capturam o que nenhuma regra
+específica tratou. DEVEM ficar no fim do arquivo: qualquer regra irmã
+definida depois delas nunca seria alcançada. Os IDs pertencem às faixas
+100000 e 100500.
+============================================================================ -->
+
+  <rule id="100010" level="2">
+    <if_sid>60137, 67023</if_sid>
+    <field name="win.system.eventID">^4634$</field>
+    <description>Logoff de usuário bem-sucedido</description>
+    <group>logoff,</group>
+  </rule>
+
+  <rule id="100508" level="2">
+    <if_sid>60106</if_sid>
+    <description>Login bem-sucedido</description>
+    <group>authentication_success,session_start,</group>
+  </rule>
+
+  <rule id="100011" level="2">
+    <if_sid>60122</if_sid>
+    <description>Falha de login de $(win.eventdata.targetUserName)</description>
+    <group>windows_security,authentication_failed,</group>
+    <options>no_full_log</options>
+  </rule>
+
+  <rule id="100012" level="0">
+    <if_sid>100011</if_sid>
+    <field name="win.eventdata.subjectDomainName" type="pcre2">(?i)^IIS APPPOOL$</field>
+    <description>Ignorar falhas de autenticação do IIS AppPool</description>
+  </rule>
+
+  <!-- Falhas de login no e-mail a partir de IP interno (fora do horário vem primeiro) -->
+  <rule id="100013" level="12" frequency="8" timeframe="60">
+    <if_matched_sid>100011</if_matched_sid>
+    <time>22:00 - 08:00</time>
+    <field name="win.eventdata.processName" type="pcre2">(?i)\\w3wp\.exe$</field>
+    <field name="win.eventdata.logonType">^8$</field>
+    <field name="win.eventdata.ipAddress" type="pcre2">^(10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.)</field>
+    <description>[INTERNO] Múltiplas falhas de login no e-mail fora do horário comercial (22h às 8h)</description>
+    <group>windows_security,authentication_failed,</group>
+    <options>no_full_log</options>
+  </rule>
+
+  <rule id="100014" level="3" frequency="8" timeframe="60">
+    <if_matched_sid>100011</if_matched_sid>
+    <field name="win.eventdata.processName" type="pcre2">(?i)\\w3wp\.exe$</field>
+    <field name="win.eventdata.logonType">^8$</field>
+    <field name="win.eventdata.ipAddress" type="pcre2">^(10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.)</field>
+    <description>[INTERNO] Múltiplas falhas de login no e-mail (usuário ou senha incorretos)</description>
+    <group>windows_security,authentication_failed,</group>
+    <options>no_full_log</options>
+  </rule>
+
+  <rule id="100015" level="3" frequency="5" timeframe="60">
+    <if_matched_sid>100011</if_matched_sid>
+    <same_field>win.eventdata.targetUserName</same_field>
+    <description>Múltiplas falhas de login do usuário $(win.eventdata.targetUserName)</description>
+    <group>windows_security,authentication_failed,</group>
+    <options>no_full_log</options>
+  </rule>
+
+</group>

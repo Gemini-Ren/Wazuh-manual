@@ -1,0 +1,38 @@
+<!--  ===========================================================================
+Categoria: Firewall - pfSense (filterlog)
+Descrição: Silenciamento dos eventos do filtro do pfSense (acessos
+bloqueados, liberados e de NAT/rede local) e alerta de IP com múltiplos
+bloqueios em curto período.
+
+Faixa de IDs:
+102400 - 102499
+============================================================================= -->
+
+<group name="pfsense,filter,logs,">
+
+  <rule id="102400" level="0">
+    <if_sid>87701</if_sid>
+    <description>[FILTER-CD] Acesso bloqueado</description>
+    <group>pfsense_block,</group>
+  </rule>
+
+  <rule id="102401" level="0">
+    <if_sid>87700</if_sid>
+    <match>pass</match>
+    <description>[FILTER-CD] Acesso liberado</description>
+  </rule>
+
+  <rule id="102402" level="0">
+    <if_sid>87700</if_sid>
+    <match>nat</match>
+    <description>[FILTER-CD] Acesso de rede local</description>
+  </rule>
+
+  <!-- Múltiplos bloqueios do mesmo IP (conta os bloqueios silenciados na 102400) -->
+  <rule id="102403" level="8" frequency="20" timeframe="60" ignore="300">
+    <if_matched_group>pfsense_block</if_matched_group>
+    <same_source_ip />
+    <description>Firewall: IP $(srcip) gerou múltiplos bloqueios em curto período</description>
+  </rule>
+
+</group>

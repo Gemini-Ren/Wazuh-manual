@@ -1,0 +1,15 @@
+{
+  "config_id": "smtp-wazuh",
+  "config": {
+    "name": "SMTP Wazuh",
+    "description": "Servidor de e-mail usado pelo Wazuh Manager (ossec.conf), sem autenticação",
+    "config_type": "smtp_account",
+    "is_enabled": true,
+    "smtp_account": {
+      "host": "192.0.2.25",
+      "port": 25,
+      "method": "none",
+      "from_address": "wazuh-reports@exemplo.com.br"
+    }
+  }
+}

@@ -1,0 +1,112 @@
+<!--  ===========================================================================
+Categoria: VPN - OpenVPN
+Descrição: Regras de autenticação e sessão de usuários na VPN OpenVPN:
+logon (TOTP), logoff, falhas de login, timeout por inatividade, dados da
+sessão, versões fora do horário comercial (22h às 8h) e múltiplas falhas.
+Dependência: decoder custom-openvpn
+Observação: o horário considerado é o do servidor Wazuh (manager)
+
+Faixa de IDs:
+100900 - 100999
+============================================================================= -->
+
+<group name="openvpn,vpn,authentications,">
+
+  <!-- ===================== Sessão ===================== -->
+
+  <rule id="100900" level="3">
+    <decoded_as>custom-openvpn</decoded_as>
+    <match>Peer Connection Initiated</match>
+    <description>[OPENVPN] Dados da sessão estabelecidos</description>
+  </rule>
+
+  <rule id="100901" level="3">
+    <decoded_as>custom-openvpn</decoded_as>
+    <match>MULTI_sva</match>
+    <description>[OPENVPN] Associação de IP público com IP da VPN</description>
+  </rule>
+
+  <!-- ===================== Logon ===================== -->
+
+  <rule id="100902" level="3">
+    <decoded_as>custom-openvpn</decoded_as>
+    <match>TOTP VPN</match>
+    <description>[OPENVPN] Logon</description>
+  </rule>
+
+  <rule id="100903" level="12">
+    <if_sid>100902</if_sid>
+    <time>22:00 - 08:00</time>
+    <description>[OPENVPN] Logon fora do horário comercial (22h às 8h)</description>
+  </rule>
+
+  <!-- ===================== Logoff ===================== -->
+
+  <rule id="100904" level="3">
+    <decoded_as>custom-openvpn</decoded_as>
+    <match>CC-EEN</match>
+    <description>[OPENVPN] Logoff</description>
+  </rule>
+
+  <rule id="100905" level="7">
+    <if_sid>100904</if_sid>
+    <time>22:00 - 08:00</time>
+    <description>[OPENVPN] Logoff fora do horário comercial (22h às 8h)</description>
+  </rule>
+
+  <rule id="100906" level="3">
+    <decoded_as>custom-openvpn</decoded_as>
+    <match>OCC</match>
+    <description>[OPENVPN] Logoff</description>
+  </rule>
+
+  <!-- ===================== Timeout por inatividade ===================== -->
+
+  <rule id="100907" level="3">
+    <decoded_as>custom-openvpn</decoded_as>
+    <match>Inactivity</match>
+    <description>[OPENVPN] Sessão encerrada por inatividade (timeout)</description>
+  </rule>
+
+  <rule id="100908" level="7">
+    <if_sid>100907</if_sid>
+    <time>22:00 - 08:00</time>
+    <description>[OPENVPN] Timeout fora do horário comercial (22h às 8h)</description>
+  </rule>
+
+  <!-- ===================== Falhas de login ===================== -->
+  <!-- O grupo openvpn_auth_failed permite contar as falhas dentro e fora do horário juntas -->
+
+  <rule id="100909" level="5">
+    <decoded_as>custom-openvpn</decoded_as>
+    <match>could not</match>
+    <description>[OPENVPN] Falha de login</description>
+    <group>openvpn_auth_failed,authentication_failed,</group>
+  </rule>
+
+  <rule id="100910" level="10">
+    <if_sid>100909</if_sid>
+    <time>22:00 - 08:00</time>
+    <description>[OPENVPN] Falha de login fora do horário comercial (22h às 8h)</description>
+    <group>openvpn_auth_failed,authentication_failed,</group>
+  </rule>
+
+  <!-- Múltiplas falhas: a de fora do horário vem primeiro para ser avaliada antes -->
+  <rule id="100911" level="12" frequency="5" timeframe="120">
+    <if_matched_group>openvpn_auth_failed</if_matched_group>
+    <time>22:00 - 08:00</time>
+    <description>[OPENVPN] Múltiplas falhas de login fora do horário comercial</description>
+    <mitre>
+      <id>T1110</id>
+    </mitre>
+  </rule>
+
+  <rule id="100912" level="10" frequency="5" timeframe="120">
+    <if_matched_group>openvpn_auth_failed</if_matched_group>
+    <description>[OPENVPN] Múltiplas falhas de login</description>
+    <mitre>
+      <id>T1110</id>
+    </mitre>
+  </rule>
+
+</group>

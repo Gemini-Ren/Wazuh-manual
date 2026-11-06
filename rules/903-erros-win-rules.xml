@@ -1,0 +1,201 @@
+<!--  ===========================================================================
+Categoria: Windows - Erros do Sistema
+Descrição: Classificação de erros do log System do Windows: alertas fatais
+do Schannel/TLS, falhas de autenticação do Netlogon, processamento de GPO,
+serviços finalizados com erro e tentativas de senha na conta Administrador.
+Observação: a regra 100622 (erros gerais) captura todo erro do System não
+tratado acima. Por carregar antes, ela impede que a 101000 do
+907-echos-system-rules.xml seja alcançada (ambas rebaixam o evento), e é
+usada como pai pelas regras 103002 e 103003 do 924-monit-power-rules.xml
+(desligamento inesperado). Não remover sem ajustar o 24.
+
+Faixa de IDs:
+100600 - 100699
+============================================================================= -->
+
+<group name="windows,system,errors,fails,">
+
+  <!-- ===================== Schannel / TLS (base: 61102) ===================== -->
+
+  <!-- 40 - Handshake Failure -->
+  <rule id="100600" level="1">
+    <if_sid>61102</if_sid>
+    <match>The following fatal alert was received: 40</match>
+    <description>TLS alerta 40: Handshake Failure (falha na negociação TLS/SSL)</description>
+    <group>schannel,tls,error,</group>
+  </rule>
+
+  <!-- 41 - No Certificate -->
+  <rule id="100601" level="1">
+    <if_sid>61102</if_sid>
+    <match>The following fatal alert was received: 41</match>
+    <description>TLS alerta 41: No Certificate (nenhum certificado fornecido pelo cliente)</description>
+    <group>schannel,tls,error,</group>
+  </rule>
+
+  <!-- 42 - Bad Certificate -->
+  <rule id="100602" level="1">
+    <if_sid>61102</if_sid>
+    <match>The following fatal alert was received: 42</match>
+    <description>TLS alerta 42: Bad Certificate (certificado inválido ou corrompido)</description>
+    <group>schannel,tls,error,</group>
+  </rule>
+
+  <!-- 43 - Unsupported Certificate -->
+  <rule id="100603" level="1">
+    <if_sid>61102</if_sid>
+    <match>The following fatal alert was received: 43</match>
+    <description>TLS alerta 43: Unsupported Certificate (certificado não suportado)</description>
+    <group>schannel,tls,error,</group>
+  </rule>
+
+  <!-- 44 - Certificate Revoked -->
+  <rule id="100604" level="1">
+    <if_sid>61102</if_sid>
+    <match>The following fatal alert was received: 44</match>
+    <description>TLS alerta 44: Certificate Revoked (certificado revogado)</description>
+    <group>schannel,tls,error,</group>
+  </rule>
+
+  <!-- 45 - Certificate Expired -->
+  <rule id="100605" level="1">
+    <if_sid>61102</if_sid>
+    <match>The following fatal alert was received: 45</match>
+    <description>TLS alerta 45: Certificate Expired (certificado expirado)</description>
+    <group>schannel,tls,error,</group>
+  </rule>
+
+  <!-- 46 - Certificate Unknown -->
+  <rule id="100606" level="1">
+    <if_sid>61102</if_sid>
+    <match>The following fatal alert was received: 46</match>
+    <description>TLS alerta 46: Certificate Unknown (certificado desconhecido)</description>
+    <group>schannel,tls,error,</group>
+  </rule>
+
+  <!-- 47 - Illegal Parameter -->
+  <rule id="100607" level="1">
+    <if_sid>61102</if_sid>
+    <match>The following fatal alert was received: 47</match>
+    <description>TLS alerta 47: Illegal Parameter (parâmetro inválido na negociação TLS)</description>
+    <group>schannel,tls,error,</group>
+  </rule>
+
+  <!-- 48 - Unknown CA -->
+  <rule id="100608" level="1">
+    <if_sid>61102</if_sid>
+    <match>The following fatal alert was received: 48</match>
+    <description>TLS alerta 48: Unknown CA (autoridade certificadora desconhecida)</description>
+    <group>schannel,tls,error,</group>
+  </rule>
+
+  <!-- 50 - Decode Error -->
+  <rule id="100609" level="1">
+    <if_sid>61102</if_sid>
+    <match>The following fatal alert was received: 50</match>
+    <description>TLS alerta 50: Decode Error (erro ao decodificar mensagem TLS)</description>
+    <group>schannel,tls,error,</group>
+  </rule>
+
+  <!-- 51 - Decrypt Error -->
+  <rule id="100610" level="1">
+    <if_sid>61102</if_sid>
+    <match>The following fatal alert was received: 51</match>
+    <description>TLS alerta 51: Decrypt Error (erro de decriptação TLS)</description>
+    <group>schannel,tls,error,</group>
+  </rule>
+
+  <!-- 70 - Protocol Version -->
+  <rule id="100611" level="1">
+    <if_sid>61102</if_sid>
+    <match>The following fatal alert was received: 70</match>
+    <description>TLS alerta 70: Protocol Version (versão TLS não suportada)</description>
+    <group>schannel,tls,error,</group>
+  </rule>
+
+  <!-- 71 - Insufficient Security -->
+  <rule id="100612" level="5">
+    <if_sid>61102</if_sid>
+    <match>The following fatal alert was received: 71</match>
+    <description>TLS alerta 71: Insufficient Security (parâmetros de segurança insuficientes)</description>
+    <group>schannel,tls,error,</group>
+  </rule>
+
+  <!-- 80 - Internal Error -->
+  <rule id="100613" level="1">
+    <if_sid>61102</if_sid>
+    <match>The following fatal alert was received: 80</match>
+    <description>TLS alerta 80: Internal Error (erro interno do Schannel/TLS)</description>
+    <group>schannel,tls,error,</group>
+  </rule>
+
+  <!-- 90 - User Canceled -->
+  <rule id="100614" level="1">
+    <if_sid>61102</if_sid>
+    <match>The following fatal alert was received: 90</match>
+    <description>TLS alerta 90: User Canceled (cancelamento da conexão pelo usuário)</description>
+    <group>schannel,tls,error,</group>
+  </rule>
+
+  <!-- 112 - Unrecognized Name -->
+  <rule id="100615" level="1">
+    <if_sid>61102</if_sid>
+    <match>The following fatal alert was received: 112</match>
+    <description>TLS alerta 112: Unrecognized Name (nome do servidor não reconhecido)</description>
+    <group>schannel,tls,error,</group>
+  </rule>
+
+  <!-- 120 - No Renegotiation -->
+  <rule id="100616" level="1">
+    <if_sid>61102</if_sid>
+    <match>The following fatal alert was received: 120</match>
+    <description>TLS alerta 120: No Renegotiation (renegociação TLS não permitida)</description>
+    <group>schannel,tls,error,</group>
+  </rule>
+
+  <!-- ===================== Outros erros do System ===================== -->
+
+  <rule id="100617" level="3">
+    <if_sid>61102</if_sid>
+    <field name="win.system.eventID">^5722$</field>
+    <description>Netlogon: acesso negado, falha na autenticação da conta de computador</description>
+  </rule>
+
+  <rule id="100618" level="2">
+    <if_sid>61102</if_sid>
+    <field name="win.system.eventID">^1058$</field>
+    <description>Falha no processamento da GPO</description>
+  </rule>
+
+  <rule id="100619" level="2">
+    <if_sid>61102</if_sid>
+    <field name="win.system.eventID">^5$</field>
+    <description>Envio de tickets fora do tempo</description>
+  </rule>
+
+  <rule id="100620" level="2">
+    <if_sid>61102</if_sid>
+    <field name="win.system.eventID">^7023$</field>
+    <description>Serviço $(win.eventdata.param1) finalizado com erro</description>
+  </rule>
+
+  <!-- 12294: tentativas de senha na conta Administrador (que não pode ser bloqueada) -->
+  <rule id="100621" level="10">
+    <if_sid>61102</if_sid>
+    <field name="win.system.eventID">^12294$</field>
+    <description>Possível ataque de senha na conta Administrador: o SAM não conseguiu bloquear a conta após inúmeras falhas</description>
+    <mitre>
+      <id>T1110</id>
+    </mitre>
+  </rule>
+
+  <!-- ATENÇÃO: regra sem condição, captura todo erro do System não tratado acima.
+       Por ser filha da 61102, impede que filhas da 61102 em arquivos carregados
+       depois deste sejam alcançadas; esses arquivos devem usar esta regra como
+       pai (como faz o 924-monit-power-rules.xml). -->
+  <rule id="100622" level="2">
+    <if_sid>61102</if_sid>
+    <description>Erros gerais do sistema</description>
+  </rule>
+
+</group>

@@ -1,0 +1,203 @@
+<!--  ===========================================================================
+Categoria: Windows - Ecos do Sistema e Monitoramentos Gerais
+Descrição: Silenciamento de erros conhecidos do Windows (System, Application,
+WER, VSS e aplicações de parceiros) e monitoramentos gerais: criação,
+instalação, início e parada de serviços, logon com novas credenciais,
+logoff de usuários críticos e alerta do Exchange com o AD.
+Dependência: lista etc/lists/critical-users
+
+Faixa de IDs:
+101000 - 101199
+============================================================================= -->
+
+<group name="windows,system-echos,">
+
+  <!-- ===================== Ecos: erros conhecidos para não monitorar ===================== -->
+
+  <rule id="101000" level="1">
+    <if_sid>61102</if_sid>
+    <field name="win.system.eventID" type="pcre2">^(10016|10028|36881|1006|1014|11|4|10036|1030|36887)$</field>
+    <description>Ecos do sistema (erros para não monitorar)</description>
+    <options>no_full_log</options>
+  </rule>
+
+  <rule id="101001" level="1">
+    <if_sid>60602</if_sid>
+    <field name="win.system.eventID" type="pcre2">^(1|9003|2513|257|4156|9646|108|9877|2006|210|12016|12291|4113|8193|1014|8200|2604|1511|1000|1015|2153|4999)$</field>
+    <description>Ecos do sistema (erros de aplicação para não monitorar)</description>
+    <options>no_full_log</options>
+  </rule>
+
+  <rule id="101002" level="1">
+    <if_sid>60608</if_sid>
+    <description>Eventos de resumo do WER</description>
+    <options>no_full_log</options>
+  </rule>
+
+  <!-- Aplicações de parceiros [PARCEIROS] -->
+  <rule id="101003" level="1">
+    <if_sid>60602</if_sid>
+    <field name="win.system.eventID">^1000$</field>
+    <match type="pcre2">(?:Parceiro\.App1\.exe|Parceiro\.App2\.exe|Parceiro\.App3\.exe|Parceiro\.App4\.exe|Parceiro\.App5\.exe|Parceiro\.App6\.exe)</match>
+    <description>Erros de aplicação de parceiros [PARCEIROS]</description>
+    <group>error,windows,system,</group>
+    <options>no_full_log</options>
+  </rule>
+
+  <rule id="101004" level="1">
+    <if_sid>61017</if_sid>
+    <match type="pcre2">(?:Parceiro\.App1\.exe|Parceiro\.App2\.exe|Parceiro\.App3\.exe|Parceiro\.App4\.exe|Parceiro\.App5\.exe|Parceiro\.App6\.exe)</match>
+    <description>Erros do sistema de parceiros [PARCEIROS]</description>
+    <group>error,windows,system,</group>
+    <options>no_full_log</options>
+  </rule>
+
+  <!-- VSS (Volume Shadow Copy Service) -->
+  <rule id="101005" level="1">
+    <if_sid>750</if_sid>
+    <match>HKEY_LOCAL_MACHINE\System\CurrentControlSet\Services\VSS\Diag\WMI Writer</match>
+    <description>Ecos de modificação de registro (VSS WMI Writer)</description>
+    <options>no_full_log</options>
+  </rule>
+
+  <rule id="101006" level="1">
+    <if_sid>594</if_sid>
+    <field name="syscheck.path" type="pcre2">(?i)^HKEY_LOCAL_MACHINE\\+System\\+CurrentControlSet\\+Services\\+VSS\\+</field>
+    <description>Ignorando alterações com origem no VSS (Volume Shadow Copy Service)</description>
+    <group>vss,windows,</group>
+    <options>no_full_log</options>
+  </rule>
+
+  <rule id="101007" level="1">
+    <if_sid>750</if_sid>
+    <field name="syscheck.path" type="pcre2">(?i)^HKEY_LOCAL_MACHINE\\+System\\+CurrentControlSet\\+Services\\+VSS\\+</field>
+    <description>Ignorando alterações de integridade com origem no VSS (Volume Shadow Copy Service)</description>
+    <group>vss,windows,</group>
+    <options>no_full_log</options>
+  </rule>
+
+  <!-- Exchange -->
+  <rule id="101008" level="2">
+    <if_sid>60602</if_sid>
+    <field name="win.system.eventID">^2501$</field>
+    <field name="win.system.providerName" type="pcre2">MSExchange ADAccess</field>
+    <description>Exchange não conseguiu validar o site do AD (possível problema de DNS/AD)</description>
+    <options>no_full_log</options>
+  </rule>
+
+  <!-- ===================== Serviços e instalações ===================== -->
+
+  <!-- ATENÇÃO: regra sem condição extra, captura todo 7045 que chegar à 61138 -->
+  <rule id="101009" level="7">
+    <if_sid>61138</if_sid>
+    <description>Serviço criado pelo usuário $(win.eventdata.accountName)</description>
+    <group>windows,service,critical_user,</group>
+    <options>no_full_log</options>
+  </rule>
+
+  <rule id="101010" level="7">
+    <if_sid>60612</if_sid>
+    <description>Aplicação sendo instalada no servidor pelo usuário</description>
+    <group>service,application,windows,</group>
+    <options>no_full_log</options>
+  </rule>
+
+  <rule id="101011" level="7">
+    <if_sid>60610</if_sid>
+    <field name="win.system.eventID">^1040$</field>
+    <description>Início do processo de instalação</description>
+    <group>service,application,windows,</group>
+    <options>no_full_log</options>
+  </rule>
+
+  <rule id="101012" level="7">
+    <if_sid>90501</if_sid>
+    <field name="win.system.eventID">^4098$</field>
+    <description>Usuário iniciou o serviço $(win.system.providerName)</description>
+    <group>service,application,windows,</group>
+    <options>no_full_log</options>
+  </rule>
+
+  <rule id="101013" level="7">
+    <if_sid>90503</if_sid>
+    <field name="win.system.eventID">^4100$</field>
+    <description>Usuário parou/finalizou o serviço $(win.system.providerName)</description>
+    <group>service,application,windows,</group>
+    <options>no_full_log</options>
+  </rule>
+
+  <!-- ===================== Logon com novas credenciais (tipo 9) ===================== -->
+
+  <rule id="101014" level="1">
+    <if_sid>67022</if_sid>
+    <field name="win.eventdata.targetOutboundUserName" type="pcre2">services</field>
+    <description>Logon de conta de serviço</description>
+    <group>windows,service,</group>
+    <options>no_full_log</options>
+  </rule>
+
+  <rule id="101015" level="2">
+    <if_sid>67022</if_sid>
+    <field name="win.eventdata.logonType">^9$</field>
+    <field name="win.system.eventID">^4624$</field>
+    <description>Uma conta de usuário fez logon com novas credenciais</description>
+    <group>windows,logon,</group>
+    <options>no_full_log</options>
+  </rule>
+
+  <rule id="101016" level="3">
+    <if_sid>101015</if_sid>
+    <list field="win.eventdata.targetUserName" lookup="match_key">etc/lists/critical-users</list>
+    <description>Usuário crítico $(win.eventdata.targetUserName) fez logon usando novas credenciais</description>
+    <group>windows,authentication_success,</group>
+    <options>no_full_log</options>
+  </rule>
+
+  <!-- ===================== Logoff ===================== -->
+
+  <rule id="101017" level="7">
+    <if_sid>60137, 67023</if_sid>
+    <field name="win.system.eventID">^4634$</field>
+    <field name="win.eventdata.logonType">^9$</field>
+    <description>Uma conta de usuário fez logoff (sessão com novas credenciais)</description>
+    <group>windows,logoff,</group>
+    <options>no_full_log</options>
+  </rule>
+
+  <!-- Logoff interativo (tipo 2) de usuário crítico -->
+  <rule id="101018" level="7">
+    <if_sid>60137, 67023</if_sid>
+    <field name="win.system.eventID">^4634$</field>
+    <field name="win.eventdata.logonType">^2$</field>
+    <list field="win.eventdata.targetUserName" lookup="match_key">etc/lists/critical-users</list>
+    <description>Usuário crítico $(win.eventdata.targetUserName) fez logoff</description>
+    <group>windows,logoff,</group>
+    <options>no_full_log</options>
+  </rule>
+
+  <!-- Escalonamento: da maior para a menor quantidade, para a mais grave ser avaliada primeiro -->
+  <rule id="101019" level="15" frequency="50" timeframe="3600">
+    <if_matched_sid>101018</if_matched_sid>
+    <same_field>win.eventdata.targetUserName</same_field>
+    <description>[ALTO RISCO] Logoff suspeito: múltiplas repetições do usuário crítico $(win.eventdata.targetUserName)</description>
+    <group>windows,logoff,suspect,</group>
+    <options>no_full_log</options>
+  </rule>
+
+  <rule id="101020" level="8" frequency="16" timeframe="3600">
+    <if_matched_sid>101018</if_matched_sid>
+    <same_field>win.eventdata.targetUserName</same_field>
+    <description>[SUSPEITO] Logoff suspeito: múltiplas repetições do usuário crítico $(win.eventdata.targetUserName)</description>
+    <group>windows,logoff,suspect,</group>
+    <options>no_full_log</options>
+  </rule>
+
+  <rule id="101021" level="6" frequency="6" timeframe="3600">
+    <if_matched_sid>101018</if_matched_sid>
+    <same_field>win.eventdata.targetUserName</same_field>
+    <description>[ATENÇÃO] Logoff suspeito: múltiplas repetições do usuário crítico $(win.eventdata.targetUserName)</description>
+    <group>windows,logoff,suspect,</group>
+    <options>no_full_log</options>
+  </rule>
+
+</group>

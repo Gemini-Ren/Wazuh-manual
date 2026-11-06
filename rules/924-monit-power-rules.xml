@@ -1,0 +1,54 @@
+<!--  ===========================================================================
+Categoria: Monitoramento - Energia e Desligamentos (Windows)
+Descrição: Regras de desligamento e reinicialização de servidores Windows:
+eventos de energia da lista kernel-power, desligamento manual (1074, com
+usuário, processo e motivo) e desligamento inesperado (6008).
+A reinicialização manual (1074 do tipo reiniciar) é tratada pela 103100
+do 925-adm-rules.xml. O desligamento sem aviso por queda de energia ou
+travamento (Kernel-Power 41) já é alertado pela nativa 61105 (nível 9).
+Pais nativos do log System: 61100 (informativo), 61101 (aviso),
+61102 (erro) e 61103 (crítico).
+Dependência: lista etc/lists/kernel-power (IDs de eventos de energia)
+
+Faixa de IDs:
+103000 - 103099
+============================================================================= -->
+
+<group name="power,windows,server,monit,">
+
+  <!-- ===================== Desligamento manual (1074) ===================== -->
+  <!-- Pai nativo 67018 (System shutdown initiated). Só o tipo "desligar";
+       o tipo "reiniciar" fica com a 103100 do 925-adm-rules.xml -->
+  <rule id="103001" level="5">
+    <if_sid>67018</if_sid>
+    <field name="win.eventdata.param5" type="pcre2">(?i)(desligar|power ?off|shutdown)</field>
+    <description>[POWER] Desligamento manual de $(win.system.computer) por $(win.eventdata.param7) via $(win.eventdata.param1). Motivo: $(win.eventdata.param3)</description>
+    <mitre>
+      <id>T1529</id>
+    </mitre>
+  </rule>
+
+  <!-- ===================== Desligamento inesperado (6008) ===================== -->
+  <!-- Erro do log System (61102). Inclui a 100622 do 903-erros-win-rules.xml,
+       que captura os erros do System não tratados antes deste arquivo -->
+  <rule id="103003" level="10">
+    <if_sid>61102, 100622</if_sid>
+    <field name="win.system.eventID">^6008$</field>
+    <description>[POWER] Desligamento inesperado em $(win.system.computer)</description>
+  </rule>
+
+  <!-- ===================== Demais eventos de energia (lista kernel-power) ===================== -->
+
+  <rule id="103000" level="2">
+    <if_sid>61100</if_sid>
+    <list field="win.system.eventID" lookup="match_key">etc/lists/kernel-power</list>
+    <description>[POWER] Evento de energia em $(win.system.computer) (ID $(win.system.eventID))</description>
+  </rule>
+
+  <rule id="103002" level="2">
+    <if_sid>61102, 100622</if_sid>
+    <list field="win.system.eventID" lookup="match_key">etc/lists/kernel-power</list>
+    <description>[POWER] Evento de energia (erro) em $(win.system.computer) (ID $(win.system.eventID))</description>
+  </rule>
+
+</group>

@@ -1,0 +1,102 @@
+<!--  ===========================================================================
+Categoria: Antivírus - Kaspersky
+Descrição: Regras de eventos do Kaspersky: ataques de rede (scan, força
+bruta RDP, DoS), objetos maliciosos detectados, downloads e sites
+bloqueados, detecções pela KSN e pela Prevenção de Intrusão do Host.
+Dependência: decoder kaspersky-base
+
+Faixa de IDs:
+101800 - 101899
+============================================================================= -->
+
+<group name="kaspersky,antivirus,">
+
+  <!-- Regra base: qualquer evento do Kaspersky não classificado abaixo -->
+  <rule id="101800" level="3">
+    <decoded_as>kaspersky-base</decoded_as>
+    <description>[KASPERSKY] Evento do antivírus</description>
+  </rule>
+
+  <!-- ===================== Ataques de rede ===================== -->
+
+  <rule id="101801" level="10">
+    <if_sid>101800</if_sid>
+    <field name="attack_type">Scan.Generic.PortScan.TCP</field>
+    <description>[KASPERSKY] Scan de rede detectado no host $(victim_hostname) a partir do IP $(hacker_ip)</description>
+    <mitre>
+      <id>T1046</id>
+    </mitre>
+  </rule>
+
+  <rule id="101802" level="15" frequency="15" timeframe="300" ignore="300">
+    <if_matched_sid>101801</if_matched_sid>
+    <same_field>hacker_ip</same_field>
+    <description>[KASPERSKY] Varredura em massa: múltiplos scans a partir do IP $(hacker_ip)</description>
+    <mitre>
+      <id>T1046</id>
+    </mitre>
+  </rule>
+
+  <rule id="101803" level="14">
+    <if_sid>101800</if_sid>
+    <field name="attack_type">Bruteforce.Generic.Rdp.a</field>
+    <description>[KASPERSKY] Tentativa de força bruta via RDP no host $(victim_hostname) a partir do IP $(hacker_ip)</description>
+    <mitre>
+      <id>T1110</id>
+    </mitre>
+  </rule>
+
+  <rule id="101804" level="3">
+    <if_sid>101800</if_sid>
+    <match>DoS.Generic.Flood.TCPSYN</match>
+    <description>[KASPERSKY] Ataque DoS (SYN flood) detectado no host $(victim_hostname)</description>
+    <mitre>
+      <id>T1498</id>
+    </mitre>
+  </rule>
+
+  <rule id="101805" level="15" frequency="2" timeframe="300" ignore="7200">
+    <if_matched_sid>101804</if_matched_sid>
+    <different_field>hacker_ip</different_field>
+    <description>[KASPERSKY] Ataque DDoS de várias fontes detectado</description>
+    <mitre>
+      <id>T1498</id>
+    </mitre>
+  </rule>
+
+  <!-- ===================== Ameaças em arquivos e navegação ===================== -->
+
+  <rule id="101806" level="14">
+    <if_sid>101800</if_sid>
+    <field name="kas_event">Objeto malicioso detectado</field>
+    <description>[KASPERSKY] Objeto malicioso detectado no host $(victim_hostname)</description>
+  </rule>
+
+  <rule id="101807" level="10">
+    <if_sid>101800</if_sid>
+    <field name="kas_event">O download do objeto foi bloqueado</field>
+    <description>[KASPERSKY] Download de objeto malicioso bloqueado no host $(victim_hostname)</description>
+  </rule>
+
+  <rule id="101808" level="7">
+    <if_sid>101800</if_sid>
+    <field name="kas_event">A visita a um site foi bloqueada</field>
+    <description>[KASPERSKY] Visita a site malicioso bloqueada no host $(victim_hostname)</description>
+  </rule>
+
+  <!-- ===================== Políticas de detecção ===================== -->
+
+  <rule id="101809" level="12">
+    <if_sid>101800</if_sid>
+    <field name="kas_policy">GNRL_EV_VIRUS_FOUND_BY_KSN</field>
+    <description>[KASPERSKY] Ameaça detectada pela KSN (Kaspersky Security Network) no host $(victim_hostname)</description>
+  </rule>
+
+  <rule id="101810" level="12">
+    <if_sid>101800</if_sid>
+    <field name="kas_policy">GNRL_EV_VIRUS_FOUND</field>
+    <field name="kas_rule">Prevenção de Intrusão do Host</field>
+    <description>[KASPERSKY] Tentativa de intrusão detectada/bloqueada pela Prevenção de Intrusão do Host em $(victim_hostname)</description>
+  </rule>
+
+</group>

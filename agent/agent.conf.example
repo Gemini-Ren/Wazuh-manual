@@ -1,0 +1,79 @@
+<agent_config>
+
+  <!-- ===================== Logon / Logoff (antigos) ===================== -->
+
+  <!-- Logon (PT e EN) - 4624, 4625, 4648 -->
+  <localfile>
+    <log_format>full_command</log_format>
+    <command>auditpol /set /subcategory:"Logon" /success:enable /failure:enable</command>
+    <alias>auditpol_logon</alias>
+    <frequency>60</frequency>
+  </localfile>
+
+  <!-- Logoff (PT e EN) -->
+  <localfile>
+    <log_format>full_command</log_format>
+    <command>auditpol /set /subcategory:"Logoff" /success:enable /failure:enable</command>
+    <alias>auditpol_logoff</alias>
+    <frequency>60</frequency>
+  </localfile>
+
+  <!-- Outros eventos de logon/logoff (PT) - 4800, 4801 -->
+  <localfile>
+    <log_format>full_command</log_format>
+    <command>auditpol /set /subcategory:"Outros Eventos de Logon/Logoff" /success:enable /failure:enable</command>
+    <alias>auditpol_outros_logon_logoff_pt</alias>
+    <frequency>60</frequency>
+  </localfile>
+
+  <!-- Other Logon/Logoff Events (EN) - 4800, 4801 -->
+  <localfile>
+    <log_format>full_command</log_format>
+    <command>auditpol /set /subcategory:"Other Logon/Logoff Events" /success:enable /failure:enable</command>
+    <alias>auditpol_other_logon_logoff_en</alias>
+    <frequency>60</frequency>
+  </localfile>
+
+  <!-- ===================== PsExec / movimento lateral (novos) ===================== -->
+
+  <!-- Extensão do Sistema de Segurança - 4697 -->
+  <localfile>
+    <log_format>full_command</log_format>
+    <command>auditpol /set /subcategory:{0CCE9211-69AE-11D9-BED3-505054503030} /success:enable /failure:enable</command>
+    <alias>auditpol_security_system_extension</alias>
+    <frequency>60</frequency>
+  </localfile>
+
+  <!-- Compartilhamento de Arquivos - 5140 -->
+  <localfile>
+    <log_format>full_command</log_format>
+    <command>auditpol /set /subcategory:{0CCE9224-69AE-11D9-BED3-505054503030} /success:enable /failure:enable</command>
+    <alias>auditpol_file_share</alias>
+    <frequency>60</frequency>
+  </localfile>
+
+  <!-- Compartilhamento de Arquivos Detalhado - 5145 -->
+  <localfile>
+    <log_format>full_command</log_format>
+    <command>auditpol /set /subcategory:{0CCE9244-69AE-11D9-BED3-505054503030} /success:enable /failure:enable</command>
+    <alias>auditpol_detailed_file_share</alias>
+    <frequency>60</frequency>
+  </localfile>
+
+  <!-- Criação de Processo - 4688 -->
+  <localfile>
+    <log_format>full_command</log_format>
+    <command>auditpol /set /subcategory:{0CCE922B-69AE-11D9-BED3-505054503030} /success:enable</command>
+    <alias>auditpol_process_creation</alias>
+    <frequency>60</frequency>
+  </localfile>
+
+  <!-- Linha de comando no 4688 -->
+  <localfile>
+    <log_format>full_command</log_format>
+    <command>reg add "HKLM\Software\Microsoft\Windows\CurrentVersion\Policies\System\Audit" /v ProcessCreationIncludeCmdLine_Enabled /t REG_DWORD /d 1 /f</command>
+    <alias>reg_process_cmdline</alias>
+    <frequency>60</frequency>
+  </localfile>
+
+</agent_config>

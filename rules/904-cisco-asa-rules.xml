@@ -1,0 +1,125 @@
+<!--  ===========================================================================
+Categoria: VPN - Cisco ASA
+Descrição: Regras de autenticação e sessão de usuários na VPN do Cisco ASA:
+conexão, desconexão, atribuição de IP, erros de conexão, falhas de login
+(4625 vindos do ASA) e versões fora do horário comercial (22h às 8h).
+Dependência: decoders custom-cisco-asa-* e custom-asa-*
+Observação: o horário considerado é o do servidor Wazuh (manager)
+
+Faixa de IDs:
+100700 - 100799
+============================================================================= -->
+
+<group name="cisco,asa,vpn,authentications,">
+
+  <!-- ========== Conexão à VPN ========== -->
+  <rule id="100700" level="3">
+    <decoded_as>custom-cisco-asa-add</decoded_as>
+    <description>[CISCO ASA] Usuário conectado à VPN com sucesso na rede local $(data.domain)</description>
+  </rule>
+
+  <rule id="100701" level="13">
+    <if_sid>100700</if_sid>
+    <time>22:00 - 08:00</time>
+    <description>[CISCO ASA] Usuário conectado à VPN na rede local $(data.domain) fora do horário comercial (22h às 8h)</description>
+    <options>alert_by_email</options>
+  </rule>
+
+  <!-- ========== Logoff da VPN ========== -->
+  <rule id="100702" level="3">
+    <decoded_as>custom-cisco-asa-del</decoded_as>
+    <description>[CISCO ASA] Usuário $(user) realizou logoff da VPN</description>
+  </rule>
+
+  <rule id="100703" level="8">
+    <if_sid>100702</if_sid>
+    <time>22:00 - 08:00</time>
+    <description>[CISCO ASA] Usuário $(user) realizou logoff da VPN fora do horário comercial (22h às 8h)</description>
+  </rule>
+
+  <!-- ========== Desconexão da sessão ========== -->
+  <rule id="100704" level="3">
+    <decoded_as>custom-cisco-asa-auth</decoded_as>
+    <description>[CISCO ASA] Usuário desconectou da sessão</description>
+  </rule>
+
+  <rule id="100705" level="8">
+    <if_sid>100704</if_sid>
+    <time>22:00 - 08:00</time>
+    <description>[CISCO ASA] Usuário desconectou da sessão fora do horário comercial (22h às 8h)</description>
+  </rule>
+
+  <!-- ========== Atribuição de IP à sessão ========== -->
+  <rule id="100706" level="3">
+    <decoded_as>custom-asa-connect</decoded_as>
+    <description>[CISCO ASA] Dados atribuídos à sessão (conversão do IP público para privado)</description>
+  </rule>
+
+  <rule id="100707" level="8">
+    <if_sid>100706</if_sid>
+    <time>22:00 - 08:00</time>
+    <description>[CISCO ASA] Dados atribuídos à sessão (conversão do IP público para privado) fora do horário comercial (22h às 8h)</description>
+  </rule>
+
+  <!-- ========== Conexão estabelecida ========== -->
+  <rule id="100708" level="3">
+    <decoded_as>custom-asa-estab</decoded_as>
+    <description>[CISCO ASA] Conexão estabelecida pela primeira vez</description>
+  </rule>
+
+  <rule id="100709" level="8">
+    <if_sid>100708</if_sid>
+    <time>22:00 - 08:00</time>
+    <description>[CISCO ASA] Conexão estabelecida pela primeira vez fora do horário comercial (22h às 8h)</description>
+  </rule>
+
+  <!-- ========== Conexão finalizada por erro ========== -->
+  <rule id="100710" level="5">
+    <decoded_as>custom-asa-error</decoded_as>
+    <description>[CISCO ASA] Conexão finalizada por erro</description>
+  </rule>
+
+  <rule id="100711" level="8">
+    <if_sid>100710</if_sid>
+    <time>22:00 - 08:00</time>
+    <description>[CISCO ASA] Conexão finalizada por erro fora do horário comercial (22h às 8h)</description>
+  </rule>
+
+  <!-- ========== Conexão sem compressão ========== -->
+  <rule id="100712" level="3">
+    <decoded_as>custom-cisco-asa-6</decoded_as>
+    <description>[CISCO ASA] Conexão estabelecida sem compressão (IP de origem)</description>
+  </rule>
+
+  <rule id="100713" level="8">
+    <if_sid>100712</if_sid>
+    <time>22:00 - 08:00</time>
+    <description>[CISCO ASA] Conexão estabelecida sem compressão (IP de origem) fora do horário comercial (22h às 8h)</description>
+  </rule>
+
+  <rule id="100714" level="3">
+    <decoded_as>custom-cisco-asa-term</decoded_as>
+    <description>[CISCO ASA] Conexão finalizada sem compressão (IP de origem)</description>
+  </rule>
+
+  <rule id="100715" level="8">
+    <if_sid>100714</if_sid>
+    <time>22:00 - 08:00</time>
+    <description>[CISCO ASA] Conexão finalizada sem compressão (IP de origem) fora do horário comercial (22h às 8h)</description>
+  </rule>
+
+  <!-- ========== Falha de login (4625 com origem no ASA) ========== -->
+  <rule id="100716" level="10">
+    <if_sid>60122</if_sid>
+    <field name="win.eventdata.ipAddress">^192.0.2.10$</field>
+    <description>[CISCO ASA] Usuário $(win.eventdata.targetUserName) falhou no login da VPN</description>
+  </rule>
+
+  <rule id="100717" level="13">
+    <if_sid>100716</if_sid>
+    <time>22:00 - 08:00</time>
+    <description>[CISCO ASA] Usuário $(win.eventdata.targetUserName) falhou no login da VPN fora do horário comercial (22h às 8h)</description>
+    <options>alert_by_email</options>
+  </rule>
+
+</group>

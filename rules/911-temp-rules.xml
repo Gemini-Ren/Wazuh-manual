@@ -1,0 +1,75 @@
+<!--  ===========================================================================
+Categoria: Regras Temporárias
+Descrição: Regras temporárias, usar apenas para testes. Atualmente:
+monitoramento da conta svc_sql_exemplo (logon, falha, bloqueio e
+RDP), teste de falha de login no Cisco ASA, alteração de registro
+(sma\MibStore) e redução de ruído de namespace negado.
+Regras que se mostrarem úteis devem ser migradas para o arquivo da
+categoria correspondente.
+
+Faixa de IDs:
+101700 - 101799
+============================================================================= -->
+
+<group name="windows,system,temps,">
+
+  <!-- ===================== Conta svc_sql_exemplo ===================== -->
+  <!-- Logons não-rede (tipos 2, 8, 9, 10) passam pela nativa 67022 antes de
+       chegar à 60106; por isso as duas aparecem como pai -->
+
+  <!-- RDP (tipo 10): vem antes do logon genérico para ser avaliada primeiro -->
+  <rule id="101700" level="6">
+    <if_sid>92653, 67022</if_sid>
+    <field name="win.system.eventID">^4624$</field>
+    <field name="win.eventdata.logonType">^10$</field>
+    <field name="win.eventdata.targetUserName" type="pcre2">(?i)^svc_sql_exemplo$</field>
+    <description>[TEMP - RDP] Logon RDP bem-sucedido usando a conta svc_sql_exemplo em $(win.system.computer) a partir de $(win.eventdata.ipAddress)</description>
+  </rule>
+
+  <rule id="101701" level="6">
+    <if_sid>60106, 67022</if_sid>
+    <field name="win.system.eventID">^4624$</field>
+    <field name="win.eventdata.targetUserName" type="pcre2">(?i)^svc_sql_exemplo$</field>
+    <field name="win.eventdata.logonType" type="pcre2">^(2|3|8|9|10)$</field>
+    <description>[TEMP] Logon bem-sucedido usando a conta svc_sql_exemplo (tipo $(win.eventdata.logonType)) em $(win.system.computer)</description>
+  </rule>
+
+  <rule id="101702" level="6">
+    <if_sid>60122</if_sid>
+    <field name="win.eventdata.targetUserName" type="pcre2">(?i)^svc_sql_exemplo$</field>
+    <description>[TEMP] Falha de logon usando a conta svc_sql_exemplo em $(win.system.computer) a partir de $(win.eventdata.ipAddress)</description>
+  </rule>
+
+  <!-- Depende da 100204 do 901-iam-rules.xml (bloqueio de conta) -->
+  <rule id="101703" level="15">
+    <if_sid>100204</if_sid>
+    <field name="win.eventdata.targetUserName" type="pcre2">(?i)^svc_sql_exemplo$</field>
+    <description>[TEMP] A conta svc_sql_exemplo foi bloqueada após múltiplos erros de login (origem: $(win.eventdata.targetDomainName))</description>
+  </rule>
+
+  <rule id="101704" level="10" frequency="2" timeframe="60">
+    <if_matched_sid>101700</if_matched_sid>
+    <description>[TEMP] Múltiplos logins RDP da conta svc_sql_exemplo</description>
+  </rule>
+
+  <!-- ===================== Outros testes ===================== -->
+
+  <rule id="101705" level="13">
+    <decoded_as>custom-asa-fail</decoded_as>
+    <description>[ASA] Teste: falha de login de usuário</description>
+    <group>cisco,asa,vpn,</group>
+    <options>no_full_log</options>
+  </rule>
+
+  <rule id="101706" level="3">
+    <if_sid>750</if_sid>
+    <field name="syscheck.path" type="pcre2">(?i)sma\\+MibStore</field>
+    <description>[TEMP] Alteração de registro em $(syscheck.path)</description>
+  </rule>
+
+  <rule id="101707" level="2">
+    <if_sid>60743</if_sid>
+    <description>[TEMP] Redução de ruído: namespace negado</description>
+  </rule>
+
+</group>

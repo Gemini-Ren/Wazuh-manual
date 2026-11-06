@@ -1,0 +1,68 @@
+<!--  ===========================================================================
+Categoria: Proxy - Squid
+Descrição: Regras de acesso web pelo Squid (CD e Matriz): registro de
+acessos fora da lista branca e dos termos de exclusão, e alertas de
+acesso a sites restritos (conteúdo adulto e casas de apostas).
+Dependências: decoder squid-cd-web; listas etc/lists/white-list-sites,
+etc/lists/ip-sec-list, etc/lists/adult-sites e etc/lists/bet-sites
+
+Faixa de IDs:
+102100 - 102199
+============================================================================= -->
+
+<!-- Termos de exclusão (CDNs, APIs, anúncios e telemetria).
+     Os prefixos (cdn., api., app. ...) só valem no início de um subdomínio,
+     e os sufixos valem tanto para domínio quanto para URL com porta ou caminho. -->
+<var name="SQUID_EXCLUDE_TERMS">(^|[/.])(cdn|static|assets|media|img|images|api|app|portal|auth|login|sso|id)\.|30\.docs\.google\.com|pa\.clients6\.google\.com|google|\.adblockplus\.org([:/]|$)|\.elastic-cloud\.com([:/]|$)|\.sentry\.io([:/]|$)|\.datadoghq\.com([:/]|$)|\.newrelic\.com([:/]|$)|\.segment\.io([:/]|$)|\.azurewebsites\.net([:/]|$)|\.cloudapp\.azure\.com([:/]|$)|\.richaudience\.com([:/]|$)|\.mythad\.com([:/]|$)|\.vidoomy\.com([:/]|$)|\.seedtag\.com([:/]|$)|\.doubleverify\.com([:/]|$)|\.sharethrough\.com([:/]|$)|\.smartadserver\.com([:/]|$)|\.adsrvr\.org([:/]|$)|amazon-adsystem\.com([:/]|$)|\.adform\.net([:/]|$)|\.outbrain\.com([:/]|$)|\.criteo\.com([:/]|$)|\.pubmatic\.com([:/]|$)|\.adnxs\.com([:/]|$)|\.rubiconproject\.com([:/]|$)|\.pendo\.io([:/]|$)|\.adsafeprotected\.com([:/]|$)|presage\.io([:/]|$)|\.teads\.tv([:/]|$)|\.yieldmo\.com([:/]|$)|\.lijit\.com([:/]|$)|\.3lift\.com([:/]|$)|\.adtarget\.com\.tr([:/]|$)|adtarget\.biz([:/]|$)|\.loopme\.me([:/]|$)|\.adkernel\.com([:/]|$)|\.chartbeat\.net([:/]|$)|\.chartbeat\.com([:/]|$)|\.requestmetrics\.com([:/]|$)|\.mrf\.io([:/]|$)|\.openx\.net([:/]|$)|\.everesttech\.net([:/]|$)|\.contextweb\.com([:/]|$)|\.quantserve\.com([:/]|$)|\.smaato\.net([:/]|$)|\.crwdcntrl\.net([:/]|$)|\.agkn\.com([:/]|$)|\.tapad\.com([:/]|$)|\.flashtalking\.com([:/]|$)|\.mathtag\.com([:/]|$)|\.krxd\.net([:/]|$)|\.id5-sync\.com([:/]|$)|\.demdex\.net([:/]|$)|\.bluekai\.com([:/]|$)|\.sonobi\.com([:/]|$)|\.gumgum\.com([:/]|$)|\.scorecardresearch\.com([:/]|$)|\.bidswitch\.net([:/]|$)|\.s-onetag\.com([:/]|$)|\.acuityplatform\.com([:/]|$)|:631/ipp/print</var>
+
+<group name="squid,proxy,access,">
+
+  <!-- 1. Regra base (nível 1 apenas para agrupamento) -->
+  <rule id="102100" level="1">
+    <category>squid</category>
+    <description>Agrupamento de eventos do Squid Proxy</description>
+  </rule>
+
+  <!-- 2. Squid CD (squid-cd-web) -->
+  <rule id="102101" level="3">
+    <if_sid>102100</if_sid>
+    <decoded_as>squid-cd-web</decoded_as>
+    <list field="url_domain" lookup="not_match_key">etc/lists/white-list-sites</list>
+    <field name="url_domain" type="pcre2" negate="yes">(?i)ctldl\.windowsupdate\.com</field>
+    <field name="url_domain" type="pcre2" negate="yes">$SQUID_EXCLUDE_TERMS</field>
+    <field name="user_name" type="pcre2" negate="yes">^-$</field>
+    <description>Squid CD: o usuário $(user_name) acessou $(url_domain) via $(proxy_conf)</description>
+  </rule>
+
+  <!-- 3. Alertas críticos (Matriz): vêm ANTES da regra de acesso geral para
+       serem avaliados primeiro e não serem afetados pelas exclusões.
+       Disparam para qualquer máquina FORA da equipe de cybersecurity. -->
+  <rule id="102102" level="14">
+    <if_sid>102100</if_sid>
+    <program_name type="pcre2">^\(squid-1\)$</program_name>
+    <list field="srcip" lookup="not_address_match_key">etc/lists/ip-sec-list</list>
+    <list field="url" lookup="match_key">etc/lists/adult-sites</list>
+    <description>[ALERTA] A máquina $(srcip) acessou o site restrito $(url) [CLASSIFICAÇÃO: conteúdo adulto]</description>
+    <options>alert_by_email</options>
+  </rule>
+
+  <rule id="102103" level="14">
+    <if_sid>102100</if_sid>
+    <program_name type="pcre2">^\(squid-1\)$</program_name>
+    <list field="srcip" lookup="not_address_match_key">etc/lists/ip-sec-list</list>
+    <list field="url" lookup="match_key">etc/lists/bet-sites</list>
+    <description>[ALERTA] A máquina $(srcip) acessou o site restrito $(url) [CLASSIFICAÇÃO: casa de apostas]</description>
+    <options>alert_by_email</options>
+  </rule>
+
+  <!-- 4. Squid Matriz (squid-1): acessos não-GET fora das exclusões -->
+  <rule id="102104" level="3">
+    <if_sid>102100</if_sid>
+    <program_name type="pcre2">^\(squid-1\)$</program_name>
+    <list field="url" lookup="not_match_key">etc/lists/white-list-sites</list>
+    <url type="pcre2" negate="yes">$SQUID_EXCLUDE_TERMS</url>
+    <action type="pcre2" negate="yes">^GET$</action>
+    <description>Squid Matriz: acesso de $(srcip) para $(url) [status: $(status)]</description>
+  </rule>
+
+</group>

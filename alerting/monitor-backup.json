@@ -1,0 +1,50 @@
+{
+  "type": "monitor",
+  "monitor_type": "query_level_monitor",
+  "name": "[INFRA] Backup não executado",
+  "enabled": true,
+  "schedule": {
+    "cron": { "expression": "0 9 * * *", "timezone": "America/Sao_Paulo" }
+  },
+  "inputs": [
+    {
+      "search": {
+        "indices": ["wazuh-alerts-*"],
+        "query": {
+          "size": 0,
+          "query": {
+            "bool": {
+              "filter": [
+                { "range": { "timestamp": { "gte": "now-26h" } } },
+                { "term": { "rule.groups": "backup" } },
+                { "term": { "data.backup_status": "sucesso" } }
+              ]
+            }
+          }
+        }
+      }
+    }
+  ],
+  "triggers": [
+    {
+      "query_level_trigger": {
+        "name": "Nenhum backup com sucesso em 26 horas",
+        "severity": "1",
+        "condition": {
+          "script": { "source": "ctx.results[0].hits.total.value == 0", "lang": "painless" }
+        },
+        "actions": [
+          {
+            "name": "Enviar e-mail",
+            "destination_id": "email-soc",
+            "subject_template": { "source": "[WAZUH] Backup não executado nas últimas 26 horas" },
+            "message_template": {
+              "source": "Nenhum backup com sucesso foi registrado no Wazuh nas últimas 26 horas.\n\nVerifique se a rotina de backup do Wazuh Manager foi executada e se o log está chegando ao Wazuh.\n\nMonitor: {{ctx.monitor.name}}\nVerificação: {{ctx.periodEnd}}"
+            },
+            "throttle_enabled": false
+          }
+        ]
+      }
+    }
+  ]
+}

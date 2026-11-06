@@ -1,0 +1,28 @@
+<!--  ===========================================================================
+Categoria: Falsos Positivos / Saúde do Agente
+Descrição: Rebaixamento de alertas que geram ruído sem ação imediata.
+Fila de eventos do agente cheia: o alerta individual é rebaixado e só
+alerta quando se repete no mesmo agente.
+
+Faixa de IDs:
+101500 - 101599
+============================================================================= -->
+
+<group name="false_positive,wazuh,">
+
+  <!-- Fila de eventos do agente cheia (nativa 203): rebaixa o alerta individual -->
+  <rule id="101500" level="2">
+    <if_sid>203</if_sid>
+    <description>A fila de eventos do agente está cheia. Eventos podem ser perdidos.</description>
+    <options>no_full_log</options>
+  </rule>
+
+  <!-- Repetição no mesmo agente: perda de eventos recorrente -->
+  <rule id="101501" level="10" frequency="10" timeframe="60" ignore="300">
+    <if_matched_sid>101500</if_matched_sid>
+    <same_location />
+    <description>[Múltiplos eventos] A fila de eventos do agente está cheia repetidamente. Eventos podem estar sendo perdidos.</description>
+    <options>no_full_log</options>
+  </rule>
+
+</group>

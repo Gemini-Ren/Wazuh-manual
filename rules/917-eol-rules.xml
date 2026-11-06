@@ -1,0 +1,52 @@
+<!--  ===========================================================================
+Categoria: Vulnerabilidade - Software em Fim de Vida (EOL)
+Descrição: Regras de detecção de softwares e sistemas operacionais em fim
+de vida (End of Life) nos agentes, classificadas pelo tempo desde o EOL:
+até 99 dias, de 100 a 999 dias e 1000 dias ou mais.
+Dependência: integração eol_detector (eventos JSON com campo integration)
+
+Faixa de IDs:
+102300 - 102399
+============================================================================= -->
+
+<group name="eol,">
+
+  <!-- Regra base: qualquer software em EOL -->
+  <rule id="102300" level="7">
+    <decoded_as>json</decoded_as>
+    <field name="integration">^eol_detector$</field>
+    <description>Software em EOL detectado: $(eol.product) $(eol.version) no agente $(eol.agent_name), em fim de vida desde $(eol.eol_date)</description>
+    <options>no_full_log</options>
+    <group>eol_software,pci_dss_6.3.3,nist_800_53_CM.8,hipaa_164.312.a.1,</group>
+  </rule>
+
+  <!-- Pacote de 100 a 999 dias após o EOL -->
+  <rule id="102301" level="10">
+    <if_sid>102300</if_sid>
+    <field name="eol.type">^package$</field>
+    <field name="eol.days_past_eol" type="pcre2">^\d{3}$</field>
+    <description>EOL RISCO ALTO: $(eol.product) $(eol.version) no agente $(eol.agent_name) está há $(eol.days_past_eol) dias em fim de vida</description>
+    <options>no_full_log</options>
+    <group>eol_software,pci_dss_6.3.3,nist_800_53_CM.8,hipaa_164.312.a.1,</group>
+  </rule>
+
+  <!-- Pacote com 1000 dias ou mais após o EOL -->
+  <rule id="102302" level="13">
+    <if_sid>102300</if_sid>
+    <field name="eol.type">^package$</field>
+    <field name="eol.days_past_eol" type="pcre2">^\d{4,}$</field>
+    <description>EOL RISCO CRÍTICO: $(eol.product) $(eol.version) no agente $(eol.agent_name) está há $(eol.days_past_eol) dias em fim de vida</description>
+    <options>no_full_log</options>
+    <group>eol_software,pci_dss_6.3.3,nist_800_53_CM.8,hipaa_164.312.a.1,</group>
+  </rule>
+
+  <!-- Sistema operacional em EOL -->
+  <rule id="102303" level="12">
+    <if_sid>102300</if_sid>
+    <field name="eol.type">^os$</field>
+    <description>Sistema operacional em EOL: $(eol.product) $(eol.version) no agente $(eol.agent_name), em fim de vida desde $(eol.eol_date)</description>
+    <options>no_full_log</options>
+    <group>eol_os,pci_dss_6.3.3,nist_800_53_CM.8,hipaa_164.312.a.1,</group>
+  </rule>
+
+</group>

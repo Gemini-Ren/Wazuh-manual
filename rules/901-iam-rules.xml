@@ -1,0 +1,235 @@
+<!--  ===========================================================================
+Categoria: IAM (Identity and Access Management - Gerenciamento de Identidade e Acesso)
+Descrição: Regras de gerenciamento de identidades no Active Directory:
+criação, alteração, exclusão, bloqueio e desbloqueio de usuários e
+contas de máquina, alterações em grupos e alterações de atributos
+sensíveis em objetos de usuário (SPN, UAC, UPN, lockoutTime etc.).
+Ações feitas por contas de máquina (terminadas em $) são ignoradas
+nas regras de usuário.
+
+Faixa de IDs:
+100200 - 100299
+============================================================================= -->
+
+<group name="windows,iam,users,management,machines,">
+
+  <!-- ===================== Contas de usuário ===================== -->
+
+  <rule id="100200" level="5">
+    <if_sid>60109</if_sid>
+    <field name="win.eventdata.subjectUserName" type="pcre2">^[^$]+$</field>
+    <field name="win.eventdata.targetUserName" type="pcre2">^[^$]+$</field>
+    <description>Usuário $(win.eventdata.subjectUserName) criou/habilitou o usuário $(win.eventdata.targetUserName)</description>
+  </rule>
+
+  <rule id="100201" level="5">
+    <if_sid>60110</if_sid>
+    <field name="win.eventdata.subjectUserName" type="pcre2">^[^$]+$</field>
+    <field name="win.eventdata.targetUserName" type="pcre2">^[^$]+$</field>
+    <description>Usuário $(win.eventdata.subjectUserName) modificou a conta do usuário $(win.eventdata.targetUserName)</description>
+  </rule>
+
+  <rule id="100202" level="5">
+    <if_sid>60111</if_sid>
+    <field name="win.eventdata.subjectUserName" type="pcre2">^[^$]+$</field>
+    <field name="win.eventdata.targetUserName" type="pcre2">^[^$]+$</field>
+    <description>Usuário $(win.eventdata.subjectUserName) excluiu ou desabilitou o usuário $(win.eventdata.targetUserName)</description>
+  </rule>
+
+  <rule id="100203" level="5">
+    <if_sid>60133</if_sid>
+    <field name="win.eventdata.subjectUserName" type="pcre2">^[^$]+$</field>
+    <field name="win.eventdata.targetUserName" type="pcre2">^[^$]+$</field>
+    <description>Usuário $(win.eventdata.subjectUserName) desbloqueou o usuário $(win.eventdata.targetUserName)</description>
+  </rule>
+
+  <!-- ===================== Bloqueio de conta (4740) ===================== -->
+  <!-- No 4740, targetDomainName é o computador de onde veio o bloqueio -->
+
+  <rule id="100204" level="5">
+    <if_sid>60115</if_sid>
+    <description>Usuário $(win.eventdata.targetUserName) bloqueado após múltiplos erros de login (origem: $(win.eventdata.targetDomainName))</description>
+  </rule>
+
+  <rule id="100205" level="5">
+    <if_sid>100204</if_sid>
+    <field name="win.eventdata.targetDomainName">^SRV</field>
+    <description>Usuário $(win.eventdata.targetUserName) bloqueado após múltiplos erros de login a partir do servidor $(win.eventdata.targetDomainName) [serviço ou usuário]</description>
+  </rule>
+
+  <rule id="100206" level="8" frequency="2" timeframe="120">
+    <if_matched_sid>100204</if_matched_sid>
+    <same_field>win.eventdata.targetUserName</same_field>
+    <description>Usuário $(win.eventdata.targetUserName) foi bloqueado repetidamente após múltiplos erros de login</description>
+  </rule>
+
+  <!-- ===================== Grupos ===================== -->
+
+  <rule id="100207" level="5">
+    <if_sid>60150</if_sid>
+    <field name="win.eventdata.subjectUserName" type="pcre2">^[^$]+$</field>
+    <field name="win.eventdata.targetUserName" type="pcre2">^[^$]+$</field>
+    <description>Usuário $(win.eventdata.subjectUserName) modificou o grupo universal $(win.eventdata.targetUserName)</description>
+  </rule>
+
+  <rule id="100208" level="5">
+    <if_sid>60151</if_sid>
+    <field name="win.eventdata.subjectUserName" type="pcre2">^[^$]+$</field>
+    <field name="win.eventdata.targetUserName" type="pcre2">^[^$]+$</field>
+    <description>Usuário $(win.eventdata.subjectUserName) adicionou um usuário ao grupo global $(win.eventdata.targetUserName)</description>
+  </rule>
+
+  <rule id="100209" level="5">
+    <if_sid>60148</if_sid>
+    <field name="win.eventdata.subjectUserName" type="pcre2">^[^$]+$</field>
+    <field name="win.eventdata.targetUserName" type="pcre2">^[^$]+$</field>
+    <description>Usuário $(win.eventdata.subjectUserName) modificou o grupo global $(win.eventdata.targetUserName)</description>
+  </rule>
+
+  <rule id="100210" level="5">
+    <if_sid>60141</if_sid>
+    <field name="win.eventdata.subjectUserName" type="pcre2">^[^$]+$</field>
+    <field name="win.eventdata.targetUserName" type="pcre2">^[^$]+$</field>
+    <description>Usuário $(win.eventdata.subjectUserName) adicionou um membro ao grupo global $(win.eventdata.targetUserName)</description>
+  </rule>
+
+  <rule id="100211" level="5">
+    <if_sid>60142</if_sid>
+    <field name="win.eventdata.subjectUserName" type="pcre2">^[^$]+$</field>
+    <field name="win.eventdata.targetUserName" type="pcre2">^[^$]+$</field>
+    <description>Usuário $(win.eventdata.subjectUserName) removeu um membro do grupo global $(win.eventdata.targetUserName)</description>
+  </rule>
+
+  <rule id="100212" level="5">
+    <if_sid>60113</if_sid>
+    <field name="win.eventdata.subjectUserName" type="pcre2">^[^$]+$</field>
+    <field name="win.eventdata.targetUserName" type="pcre2">^[^$]+$</field>
+    <description>Usuário $(win.eventdata.subjectUserName) modificou uma conta do grupo $(win.eventdata.targetUserName)</description>
+  </rule>
+
+  <rule id="100213" level="5">
+    <if_sid>60152</if_sid>
+    <field name="win.eventdata.subjectUserName" type="pcre2">^[^$]+$</field>
+    <field name="win.eventdata.targetUserName" type="pcre2">^[^$]+$</field>
+    <description>Usuário $(win.eventdata.subjectUserName) removeu um membro do grupo universal $(win.eventdata.targetUserName)</description>
+  </rule>
+
+  <rule id="100214" level="5">
+    <if_sid>60140</if_sid>
+    <field name="win.eventdata.subjectUserName" type="pcre2">^[^$]+$</field>
+    <field name="win.eventdata.targetUserName" type="pcre2">^[^$]+$</field>
+    <description>Usuário $(win.eventdata.subjectUserName) criou o grupo global $(win.eventdata.targetUserName)</description>
+  </rule>
+
+  <rule id="100215" level="5">
+    <if_sid>60138</if_sid>
+    <field name="win.system.eventID">^4759$</field>
+    <field name="win.eventdata.subjectUserName" type="pcre2">^[^$]+$</field>
+    <field name="win.eventdata.targetUserName" type="pcre2">^[^$]+$</field>
+    <description>Grupo $(win.eventdata.targetUserName) criado em $(win.system.computer) pelo usuário $(win.eventdata.subjectUserName)</description>
+  </rule>
+
+  <!-- ===================== Contas de máquina (terminadas em $) ===================== -->
+
+  <rule id="100216" level="5">
+    <if_sid>60109</if_sid>
+    <field name="win.eventdata.targetUserName" type="pcre2">\$$</field>
+    <description>Usuário $(win.eventdata.subjectUserName) criou/habilitou a conta de máquina $(win.eventdata.targetUserName)</description>
+  </rule>
+
+  <rule id="100217" level="5">
+    <if_sid>60110</if_sid>
+    <field name="win.eventdata.targetUserName" type="pcre2">\$$</field>
+    <description>Usuário $(win.eventdata.subjectUserName) modificou a conta de máquina $(win.eventdata.targetUserName)</description>
+  </rule>
+
+  <rule id="100218" level="5">
+    <if_sid>60121</if_sid>
+    <field name="win.system.eventID">^4741$</field>
+    <field name="win.eventdata.targetUserName" type="pcre2">\$$</field>
+    <description>Usuário $(win.eventdata.subjectUserName) criou a conta de máquina $(win.eventdata.targetUserName)</description>
+  </rule>
+
+  <rule id="100219" level="5">
+    <if_sid>60121</if_sid>
+    <field name="win.system.eventID">^4742$</field>
+    <field name="win.eventdata.targetUserName" type="pcre2">\$$</field>
+    <description>Usuário $(win.eventdata.subjectUserName) alterou a conta de máquina $(win.eventdata.targetUserName)</description>
+  </rule>
+
+  <rule id="100220" level="5">
+    <if_sid>60121</if_sid>
+    <field name="win.system.eventID">^4743$</field>
+    <field name="win.eventdata.targetUserName" type="pcre2">\$$</field>
+    <description>Usuário $(win.eventdata.subjectUserName) excluiu a conta de máquina $(win.eventdata.targetUserName)</description>
+  </rule>
+
+  <!-- ===================== Atributos alterados em objetos de usuário (5136) ===================== -->
+
+  <!-- 1. servicePrincipalName (SPN): SPN em conta de usuário permite Kerberoasting -->
+  <rule id="100221" level="8">
+    <if_sid>60229</if_sid>
+    <field name="win.eventdata.attributeLDAPDisplayName">^servicePrincipalName$</field>
+    <field name="win.eventdata.objectClass">^user$</field>
+    <description>AD atributo: SPN alterado em $(win.eventdata.objectDN) pelo usuário $(win.eventdata.subjectUserName) (valor: $(win.eventdata.attributeValue))</description>
+    <mitre>
+      <id>T1558.003</id>
+    </mitre>
+  </rule>
+
+  <!-- 2. primaryGroupID -->
+  <rule id="100222" level="5">
+    <if_sid>60229</if_sid>
+    <field name="win.eventdata.attributeLDAPDisplayName">^primaryGroupID$</field>
+    <field name="win.eventdata.objectClass">^user$</field>
+    <description>AD atributo: grupo primário de $(win.eventdata.objectDN) alterado pelo usuário $(win.eventdata.subjectUserName)</description>
+  </rule>
+
+  <!-- 3. userAccountControl (UAC) -->
+  <rule id="100223" level="7">
+    <if_sid>60229</if_sid>
+    <field name="win.eventdata.attributeLDAPDisplayName">^userAccountControl$</field>
+    <field name="win.eventdata.objectClass">^user$</field>
+    <description>AD atributo: flags de controle de conta (UAC) de $(win.eventdata.objectDN) modificadas pelo usuário $(win.eventdata.subjectUserName) (valor: $(win.eventdata.attributeValue))</description>
+  </rule>
+
+  <!-- 4. description -->
+  <rule id="100224" level="3">
+    <if_sid>60229</if_sid>
+    <field name="win.eventdata.attributeLDAPDisplayName">^description$</field>
+    <field name="win.eventdata.objectClass">^user$</field>
+    <description>AD atributo: descrição de $(win.eventdata.objectDN) alterada pelo usuário $(win.eventdata.subjectUserName)</description>
+  </rule>
+
+  <!-- 5. lockoutTime -->
+  <rule id="100225" level="9">
+    <if_sid>60229</if_sid>
+    <field name="win.eventdata.attributeLDAPDisplayName">^lockoutTime$</field>
+    <field name="win.eventdata.objectClass">^user$</field>
+    <description>AD atributo: registro de bloqueio (lockoutTime) alterado em $(win.eventdata.objectDN) pelo usuário $(win.eventdata.subjectUserName)</description>
+  </rule>
+
+  <!-- 6. displayName e givenName -->
+  <rule id="100226" level="3">
+    <if_sid>60229</if_sid>
+    <field name="win.eventdata.attributeLDAPDisplayName">^displayName$|^givenName$</field>
+    <field name="win.eventdata.objectClass">^user$</field>
+    <description>AD atributo: nome de exibição de $(win.eventdata.objectDN) alterado pelo usuário $(win.eventdata.subjectUserName)</description>
+  </rule>
+
+  <!-- 7. userPrincipalName (UPN) -->
+  <rule id="100227" level="5">
+    <if_sid>60229</if_sid>
+    <field name="win.eventdata.attributeLDAPDisplayName">^userPrincipalName$</field>
+    <field name="win.eventdata.objectClass">^user$</field>
+    <description>AD atributo: nome de logon (UPN) de $(win.eventdata.objectDN) alterado pelo usuário $(win.eventdata.subjectUserName)</description>
+  </rule>
+
+  <!-- ATENÇÃO: regra sem condição, rebaixa qualquer outro 5136 não tratado acima.
+       Impede que filhas da 60229 em arquivos carregados depois deste sejam alcançadas. -->
+  <rule id="100228" level="2">
+    <if_sid>60229</if_sid>
+    <description>Alteração de atributo do AD não monitorada (eco)</description>
+  </rule>
+
+</group>

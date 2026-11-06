@@ -1,0 +1,178 @@
+<!--  ===========================================================================
+Categoria: Wazuh Manager - Acessos e Administração
+Descrição: Regras de acesso e administração do servidor Wazuh Manager:
+falhas de login SSH (usuário inexistente e senha errada), força bruta
+(por IP, distribuída e seguida de login), logins SSH (da equipe de
+cybersecurity ou de fora dela), uso de sudo e su, sessões de root e de
+usuários comuns, criação de usuários e grupos e troca de senha.
+Dependência: lista etc/lists/ip-sec-list (IPs da equipe de cybersecurity)
+Escopo: as regras valem para qualquer agente Linux. Hoje o manager
+(wazuh-manager) é o único servidor Linux monitorado; se outros forem
+adicionados, restringir as regras com <hostname>^wazuh-manager</hostname>.
+Ordem: as falhas vêm primeiro porque definem os grupos usados pelas
+correlações de força bruta, e estas definem o grupo usado pela regra de
+login após força bruta (um grupo só pode ser usado depois de definido).
+
+Faixa de IDs:
+102900 - 102999
+============================================================================= -->
+
+<group name="wazuh,manage,monit,linux,">
+
+  <!-- ===================== Falhas de login SSH ===================== -->
+
+  <!-- Usuário inexistente (5710) -->
+  <rule id="102900" level="9">
+    <if_sid>5710</if_sid>
+    <description>[MANAGER] Usuário inexistente tentando logar via SSH a partir de $(srcip)</description>
+    <group>manager_ssh_failed,authentication_failed,</group>
+  </rule>
+
+  <!-- Senha errada (5716/5760): primeiro a origem externa, depois a interna -->
+  <rule id="102901" level="15">
+    <if_sid>5716, 5760</if_sid>
+    <list field="srcip" lookup="not_address_match_key">etc/lists/ip-sec-list</list>
+    <description>[MANAGER] CRÍTICO: o usuário $(user) falhou ao logar via SSH a partir de uma máquina fora da equipe de cybersecurity ($(srcip))</description>
+    <group>manager_ssh_failed,authentication_failed,</group>
+  </rule>
+
+  <rule id="102902" level="5">
+    <if_sid>5716, 5760</if_sid>
+    <description>[MANAGER] O usuário $(user) falhou ao logar via SSH a partir de $(srcip)</description>
+    <group>manager_ssh_failed,authentication_failed,</group>
+  </rule>
+
+  <!-- ===================== Força bruta no servidor ===================== -->
+
+  <!-- Mesmo IP, várias falhas (senha errada ou usuário inexistente) em pouco tempo -->
+  <rule id="102903" level="12" frequency="6" timeframe="120">
+    <if_matched_group>manager_ssh_failed</if_matched_group>
+    <same_srcip />
+    <description>[MANAGER] Força bruta SSH: 6 falhas de login em 2 minutos a partir de $(srcip)</description>
+    <group>manager_ssh_bruteforce,</group>
+    <mitre>
+      <id>T1110.001</id>
+    </mitre>
+  </rule>
+
+  <!-- Mesmo usuário, várias falhas vindas de IPs diferentes (ataque distribuído) -->
+  <rule id="102904" level="12" frequency="8" timeframe="600">
+    <if_matched_group>manager_ssh_failed</if_matched_group>
+    <same_user />
+    <different_srcip />
+    <description>[MANAGER] Força bruta SSH distribuída: falhas de login do usuário $(user) a partir de vários IPs em 10 minutos</description>
+    <group>manager_ssh_bruteforce,</group>
+    <mitre>
+      <id>T1110</id>
+    </mitre>
+  </rule>
+
+  <!-- Correlações de prazo mais longo -->
+  <rule id="102905" level="14" frequency="10" timeframe="3600">
+    <if_matched_sid>102900</if_matched_sid>
+    <same_srcip />
+    <description>[MANAGER] Múltiplas falhas de login SSH com usuário inexistente a partir de $(srcip)</description>
+  </rule>
+
+  <rule id="102906" level="8" frequency="5" timeframe="3600">
+    <if_matched_sid>102902</if_matched_sid>
+    <same_user />
+    <description>[MANAGER] O usuário $(user) falhou várias vezes ao logar via SSH</description>
+  </rule>
+
+  <!-- ===================== Login SSH com sucesso (5715) ===================== -->
+
+  <!-- Login vindo de um IP que acabou de fazer força bruta: vem antes das
+       demais regras de login (mesmo pai 5715) para ser avaliada primeiro -->
+  <rule id="102907" level="15" timeframe="600">
+    <if_sid>5715</if_sid>
+    <if_matched_group>manager_ssh_bruteforce</if_matched_group>
+    <same_srcip />
+    <description>[MANAGER] CRÍTICO: login SSH bem-sucedido de $(user) a partir de $(srcip) logo após força bruta do mesmo IP. Possível conta comprometida</description>
+    <group>manager_ssh_compromise,</group>
+    <mitre>
+      <id>T1110</id>
+      <id>T1078</id>
+    </mitre>
+  </rule>
+
+  <rule id="102908" level="4">
+    <if_sid>5715</if_sid>
+    <list field="srcip" lookup="address_match_key">etc/lists/ip-sec-list</list>
+    <description>[MANAGER] A máquina $(srcip) da equipe de cybersecurity logou no Wazuh Manager (usuário $(user))</description>
+  </rule>
+
+  <rule id="102909" level="12">
+    <if_sid>5715</if_sid>
+    <list field="srcip" lookup="not_address_match_key">etc/lists/ip-sec-list</list>
+    <description>[MANAGER] CRÍTICO: a máquina $(srcip), fora da equipe de cybersecurity, logou no Wazuh Manager com o usuário $(user)</description>
+  </rule>
+
+  <!-- ===================== sudo ===================== -->
+
+  <rule id="102910" level="8">
+    <if_sid>5402</if_sid>
+    <description>[MANAGER] O usuário $(srcuser) executou um comando como root via sudo</description>
+  </rule>
+
+  <rule id="102911" level="15">
+    <if_sid>5405</if_sid>
+    <description>[MANAGER] O usuário $(srcuser) tentou executar uma ação com sudo, mas não possui autorização</description>
+  </rule>
+
+  <!-- ===================== Sessões (PAM) ===================== -->
+
+  <!-- Sessão de root. Ignora as sessões abertas pelo cron e pelo systemd
+       (automáticas) e pelo sudo (já alertado pela 102910) -->
+  <rule id="102912" level="14">
+    <if_sid>5501</if_sid>
+    <user>^root$</user>
+    <program_name negate="yes" type="pcre2">(?i)^(cron|sudo|systemd)</program_name>
+    <description>[MANAGER] Sessão aberta como administrador (root) por $(srcuser)</description>
+  </rule>
+
+  <rule id="102913" level="5">
+    <if_sid>5501</if_sid>
+    <user negate="yes">^root$</user>
+    <program_name negate="yes" type="pcre2">(?i)^(su|cron|systemd)</program_name>
+    <description>[MANAGER] Login efetuado por usuário comum: $(user)</description>
+  </rule>
+
+  <rule id="102914" level="5">
+    <if_sid>5501</if_sid>
+    <program_name>^su$</program_name>
+    <description>[MANAGER] Troca de usuário: $(srcuser) alternou para a conta $(user) via su</description>
+  </rule>
+
+  <rule id="102915" level="5">
+    <if_sid>5502</if_sid>
+    <user negate="yes">^root$</user>
+    <program_name negate="yes" type="pcre2">(?i)^(su|cron|systemd)</program_name>
+    <description>[MANAGER] Logout efetuado por usuário comum: $(user)</description>
+  </rule>
+
+  <rule id="102916" level="5">
+    <if_sid>5502</if_sid>
+    <program_name>^su$</program_name>
+    <description>[MANAGER] Sessão do su encerrada para o usuário $(user)</description>
+  </rule>
+
+  <!-- ===================== Usuários, grupos e senhas ===================== -->
+
+  <rule id="102917" level="6">
+    <if_sid>5902</if_sid>
+    <description>[MANAGER] O usuário $(dstuser) foi criado no servidor de monitoramento</description>
+  </rule>
+
+  <rule id="102918" level="6">
+    <if_sid>5901</if_sid>
+    <description>[MANAGER] Foi criado um novo grupo no servidor de monitoramento</description>
+  </rule>
+
+  <rule id="102919" level="7">
+    <if_sid>5555</if_sid>
+    <hostname>wazuh-manager</hostname>
+    <description>[MANAGER] A senha do usuário $(dstuser) foi alterada</description>
+  </rule>
+
+</group>

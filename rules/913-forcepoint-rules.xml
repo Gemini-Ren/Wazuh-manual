@@ -1,0 +1,42 @@
+<!--  ===========================================================================
+Categoria: DLP - Forcepoint
+Descrição: Regras de prevenção contra perda de dados (DLP) do Forcepoint:
+alertas de violação com pontuação de risco e movimentações de dados
+permitidas e bloqueadas por usuário.
+Dependência: decoders forcepoint-dlp e forcepoint-dlp-alerts
+
+Faixa de IDs:
+101900 - 101999
+============================================================================= -->
+
+<group name="forcepoint,dlp,">
+
+  <!-- Alertas de violação de dados (com riskScore) -->
+  <rule id="101900" level="11">
+    <decoded_as>forcepoint-dlp-alerts</decoded_as>
+    <match>riskScore</match>
+    <description>[DLP] Alerta de violação de dados detectado</description>
+  </rule>
+
+  <!-- Regra principal: qualquer log decodificado pelo forcepoint-dlp -->
+  <rule id="101901" level="3">
+    <decoded_as>forcepoint-dlp</decoded_as>
+    <description>[DLP] Log de movimentação de dados detectado</description>
+  </rule>
+
+  <!-- Ação 'Permitted' -->
+  <rule id="101902" level="3">
+    <if_sid>101901</if_sid>
+    <action type="pcre2">(?i)^Permitted$</action>
+    <description>[DLP] Movimentação de dados permitida para o usuário $(srcuser)</description>
+  </rule>
+
+  <!-- Qualquer ação diferente de 'Permitted' -->
+  <rule id="101903" level="10">
+    <if_sid>101901</if_sid>
+    <action negate="yes" type="pcre2">(?i)^Permitted$</action>
+    <description>[DLP] Movimentação de dados NÃO permitida ($(action)) para o usuário $(srcuser)</description>
+    <group>security_event,</group>
+  </rule>
+
+</group>

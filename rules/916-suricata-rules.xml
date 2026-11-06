@@ -1,0 +1,19 @@
+<!--  ===========================================================================
+Categoria: IDS - Suricata
+Descrição: Regras complementares do Suricata: eventos de anomalia de
+protocolo (event_type anomaly) do EVE JSON.
+Dependência: regra nativa 86600 (eventos do Suricata)
+
+Faixa de IDs:
+102200 - 102299
+============================================================================= -->
+
+<group name="suricata,ids,">
+
+  <rule id="102200" level="3">
+    <if_sid>86600</if_sid>
+    <field name="event_type">^anomaly$</field>
+    <description>[SURICATA] Anomalia de protocolo: $(anomaly.type) $(anomaly.event)</description>
+  </rule>
+
+</group>

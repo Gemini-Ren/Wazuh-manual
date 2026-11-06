@@ -1,0 +1,340 @@
+<!--  ===========================================================================
+Categoria: Windows - Administração / TI
+Descrição: Regras relacionadas a eventos dos agentes Windows: reinicialização,
+downloads e anexos, FIM, RDP, falhas de autenticação, PsExec e movimento
+lateral, criação de processos (LOLBins, masquerading, pastas graváveis),
+logon em cache e desbloqueio de estação.
+Inclui overwrite da regra nativa 67027 (criação de processo em nível 0).
+Dependência: lista etc/lists/lolbins_vigiados
+
+Faixa de IDs:
+103100 - 103199
+============================================================================= -->
+
+<group name="windows,admin,ti,">
+
+  <rule id="103100" level="4">
+    <if_sid>67018</if_sid>
+    <field name="win.eventdata.param5" type="pcre2">(?i)(reiniciar|restart)</field>
+    <description>O computador $(win.system.computer) foi reiniciado</description>
+  </rule>
+
+<!-- Qualquer arquivo marcado como vindo da internet -->
+  <rule id="103101" level="5">
+    <if_sid>61600</if_sid>
+    <field name="win.system.eventID">^15$</field>
+    <field name="win.eventdata.targetFilename" type="pcre2">(?i)Zone\.Identifier$</field>
+    <description>Arquivo baixado: $(win.eventdata.targetFilename)</description>
+  </rule>
+
+  <rule id="103102" level="7">
+    <if_sid>103101</if_sid>
+    <field name="win.eventdata.image" type="pcre2">(?i)\\(chrome|msedge|firefox|brave|opera)\.exe$</field>
+    <description>Download via navegador ($(win.eventdata.image)): $(win.eventdata.targetFilename)</description>
+  </rule>
+
+  <rule id="103103" level="8">
+    <if_sid>103101</if_sid>
+    <field name="win.eventdata.image" type="pcre2">(?i)\\(outlook|olk)\.exe$</field>
+    <description>Anexo do Outlook salvo: $(win.eventdata.targetFilename)</description>
+  </rule>
+
+  <!-- FIM: arquivo novo na pasta Downloads -->
+  <rule id="103104" level="7">
+    <if_sid>554</if_sid>
+    <field name="file" type="pcre2">(?i)\\Downloads\\</field>
+    <description>Novo arquivo em Downloads: $(file)</description>
+  </rule>
+
+  <!-- FIM: anexo aberto pelo Outlook clássico -->
+  <rule id="103105" level="8">
+    <if_sid>554</if_sid>
+    <field name="file" type="pcre2">(?i)\\Content\.Outlook\\</field>
+    <description>Anexo do Outlook aberto: $(file)</description>
+  </rule>
+
+  <rule id="103106" level="3">
+    <if_sid>60108</if_sid>
+    <field name="win.system.eventID">^4778$</field>
+    <description>Sessão RDP reconectada pelo usuário $(win.eventdata.accountName) a partir da máquina $(win.eventdata.clientName) ($(win.eventdata.clientAddress))</description>
+  </rule>
+
+  <rule id="103107" level="3">
+    <if_sid>60108</if_sid>
+    <field name="win.system.eventID">^4779$</field>
+    <description>Sessão RDP desconectada pelo usuário $(win.eventdata.accountName) a partir da máquina $(win.eventdata.clientName) ($(win.eventdata.clientAddress))</description>
+  </rule>
+
+  <!-- Desbloqueio comum: silenciado, como o 4624 tipo 7 (103130) -->
+  <rule id="103108" level="0">
+    <if_group>windows</if_group>
+    <field name="win.system.eventID">^4801$</field>
+    <description>Windows: estação desbloqueada por $(win.eventdata.targetUserName) em $(win.system.computer)</description>
+  </rule>
+
+    <!-- Senha incorreta -->
+  <rule id="103109" level="5">
+    <if_sid>60122</if_sid>
+    <field name="win.eventdata.subStatus" type="pcre2">(?i)^0xc000006a$</field>
+    <field name="win.eventdata.logonType">^3$</field>
+    <description>Windows: senha incorreta para $(win.eventdata.targetUserName) a partir de $(win.eventdata.ipAddress) ($(win.eventdata.workstationName))</description>
+  </rule>
+
+    <!-- Usuário inexistente: comum em enumeração de contas -->
+  <rule id="103110" level="6">
+    <if_sid>60122</if_sid>
+    <field name="win.eventdata.subStatus" type="pcre2">(?i)^0xc0000064$</field>
+    <description>Windows: tentativa de logon com usuário inexistente $(win.eventdata.targetUserName) a partir de $(win.eventdata.ipAddress) ($(win.eventdata.workstationName))</description>
+    <mitre>
+      <id>T1087</id>
+    </mitre>
+  </rule>
+
+  <!-- ========== 4624: logon de rede (base para correlação, sem alerta) ========== -->
+  <rule id="103111" level="0">
+    <if_sid>60106</if_sid>
+    <field name="win.system.eventID">^4624$</field>
+    <field name="win.eventdata.logonType">^3$</field>
+    <description>Windows: logon de rede em $(win.system.computer) por $(win.eventdata.targetUserName) a partir de $(win.eventdata.ipAddress)</description>
+  </rule>
+
+  <!-- ========== 7045: serviço instalado (log System, ALVO) ========== -->
+  <!-- Pai nativo: 61138 (New Windows Service Created) -> 92650 (serviço em %systemroot%) -->
+
+  <!-- PsExec confirmado: refina a nativa 92650 -->
+  <rule id="103112" level="13">
+    <if_sid>92650</if_sid>
+    <field name="win.eventdata.imagePath" type="pcre2">(?i)psexesvc</field>
+    <description>Windows: serviço do PsExec ($(win.eventdata.serviceName)) instalado em $(win.system.computer)</description>
+    <mitre>
+      <id>T1021.002</id>
+      <id>T1569.002</id>
+    </mitre>
+  </rule>
+
+  <!-- Serviço executando comando direto (Impacket smbexec, Metasploit etc.) -->
+  <!-- Filha da 101009 (907-echos-system-rules.xml), que captura todo 7045 antes -->
+  <rule id="103113" level="12">
+    <if_sid>101009</if_sid>
+    <field name="win.eventdata.imagePath" type="pcre2">(?i)(cmd(\.exe)?\s+/[ck]|%comspec%|powershell|\\\\127\.0\.0\.1\\)</field>
+    <description>Windows: serviço suspeito executando comando em $(win.system.computer): $(win.eventdata.imagePath)</description>
+    <mitre>
+      <id>T1569.002</id>
+      <id>T1021.002</id>
+    </mitre>
+  </rule>
+
+  <!-- Correlação: PsExec logo após logon de rede na mesma máquina -->
+  <rule id="103114" level="14" timeframe="60">
+    <if_sid>103112</if_sid>
+    <if_matched_sid>103111</if_matched_sid>
+    <same_field>win.system.computer</same_field>
+    <description>Windows: PsExec em $(win.system.computer) logo após logon de rede (origem no previous_output)</description>
+    <mitre>
+      <id>T1569.002</id>
+      <id>T1021.002</id>
+    </mitre>
+  </rule>
+
+  <!-- ========== 4697: serviço instalado (Security, ALVO) ========== -->
+  <rule id="103115" level="5">
+    <field name="win.system.eventID">^4697$</field>
+    <description>Windows: serviço $(win.eventdata.serviceName) instalado em $(win.system.computer) por $(win.eventdata.subjectUserName)</description>
+    <mitre>
+      <id>T1543.003</id>
+    </mitre>
+  </rule>
+
+  <rule id="103116" level="10">
+    <if_sid>103115</if_sid>
+    <field name="win.eventdata.serviceFileName" type="pcre2">(?i)psexesvc</field>
+    <description>Windows: serviço do PsExec instalado em $(win.system.computer) por $(win.eventdata.subjectUserName)</description>
+    <mitre>
+      <id>T1569.002</id>
+    </mitre>
+  </rule>
+
+  <!-- ========== 5140: acesso a compartilhamento administrativo (ALVO) ========== -->
+  <rule id="103117" level="6">
+    <if_sid>67017</if_sid>
+    <field name="win.system.eventID">^5140$</field>
+    <field name="win.eventdata.shareName" type="pcre2">(?i)\\(ADMIN|C)\$$</field>
+    <description>Windows: acesso ao compartilhamento $(win.eventdata.shareName) em $(win.system.computer) por $(win.eventdata.subjectUserName) a partir de $(win.eventdata.ipAddress)</description>
+    <mitre>
+      <id>T1021.002</id>
+    </mitre>
+  </rule>
+
+  <!-- ========== 5145: acesso detalhado (ALVO) - requer ajuste na query do agente ========== -->
+  <rule id="103118" level="10">
+    <field name="win.system.eventID">^5145$</field>
+    <field name="win.eventdata.relativeTargetName" type="pcre2">(?i)psexesvc\.exe</field>
+    <description>Windows: executável do PsExec copiado para $(win.eventdata.shareName) em $(win.system.computer) a partir de $(win.eventdata.ipAddress)</description>
+    <mitre>
+      <id>T1570</id>
+    </mitre>
+  </rule>
+
+  <rule id="103119" level="12">
+    <field name="win.system.eventID">^5145$</field>
+    <field name="win.eventdata.relativeTargetName" type="pcre2">(?i)^psexesvc-</field>
+    <description>Windows: pipe do PsExec $(win.eventdata.relativeTargetName) em $(win.system.computer) a partir de $(win.eventdata.ipAddress)</description>
+    <mitre>
+      <id>T1569.002</id>
+    </mitre>
+  </rule>
+
+  <!-- ========== 4688: criação de processo ========== -->
+  <!-- ALVO: processo filho do serviço PsExec -->
+  <rule id="103120" level="10">
+    <if_sid>67027</if_sid>
+    <field name="win.system.eventID">^4688$</field>
+    <field name="win.eventdata.parentProcessName" type="pcre2">(?i)\\psexesvc\.exe$</field>
+    <description>Windows: processo $(win.eventdata.newProcessName) executado via PsExec em $(win.system.computer)</description>
+    <mitre>
+      <id>T1569.002</id>
+    </mitre>
+  </rule>
+
+  <!-- ORIGEM: execução do psexec.exe -->
+  <rule id="103121" level="8">
+    <if_sid>67027</if_sid>
+    <field name="win.system.eventID">^4688$</field>
+    <field name="win.eventdata.newProcessName" type="pcre2">(?i)\\psexec(64)?\.exe$</field>
+    <description>Windows: PsExec executado em $(win.system.computer) por $(win.eventdata.subjectUserName): $(win.eventdata.commandLine)</description>
+    <mitre>
+      <id>T1569.002</id>
+    </mitre>
+  </rule>
+
+  <!-- ========== 4648: credenciais explícitas (ORIGEM) ========== -->
+  <rule id="103122" level="8">
+    <field name="win.system.eventID">^4648$</field>
+    <field name="win.eventdata.processName" type="pcre2">(?i)\\psexec(64)?\.exe$</field>
+    <description>Windows: PsExec em $(win.system.computer) usou credenciais de $(win.eventdata.targetUserName) para acessar $(win.eventdata.targetServerName)</description>
+    <mitre>
+      <id>T1078</id>
+      <id>T1021.002</id>
+    </mitre>
+  </rule>
+
+ <!-- Overwrite da nativa 67027: silencia a criação de processo comum.
+       As filhas abaixo continuam disparando normalmente. -->
+  <rule id="67027" level="0" overwrite="yes">
+    <if_sid>60103</if_sid>
+    <field name="win.system.providerName">Microsoft-Windows-Security-Auditing</field>
+    <field name="win.system.eventID">4688</field>
+    <description>A process was created.</description>
+    <options>no_full_log</options>
+  </rule>
+
+<!-- Silencia comandos executados pelo próprio agente Wazuh (auditpol, reg, SCA etc.) -->
+  <rule id="103123" level="0">
+    <if_sid>67027</if_sid>
+    <field name="win.eventdata.parentProcessName" type="pcre2">(?i)\\+ossec-agent\\+wazuh-agent\.exe$</field>
+    <description>Processo iniciado pelo agente Wazuh (esperado)</description>
+  </rule>
+
+ <!-- LOLBin iniciado por Office, navegador, leitor de PDF ou script -->
+  <rule id="103124" level="12">
+    <if_sid>67027</if_sid>
+    <list field="win.eventdata.newProcessName" lookup="match_key">etc/lists/lolbins_vigiados</list>
+    <field name="win.eventdata.parentProcessName" type="pcre2">(?i)\\(winword|excel|powerpnt|outlook|onenote|msaccess|mspub|acrord32|acrobat|chrome|msedge|firefox|opera|iexplore|wscript|cscript|mshta)\.exe$</field>
+    <description>$(win.eventdata.parentProcessName) iniciou $(win.eventdata.newProcessName) em $(win.system.computer): $(win.eventdata.commandLine)</description>
+    <mitre>
+      <id>T1204.002</id>
+      <id>T1059</id>
+    </mitre>
+  </rule>
+
+ <!-- LOLBin com linha de comando típica de ataque -->
+  <rule id="103125" level="12">
+    <if_sid>67027</if_sid>
+    <list field="win.eventdata.newProcessName" lookup="match_key">etc/lists/lolbins_vigiados</list>
+    <field name="win.eventdata.commandLine" type="pcre2">(?i)(\s-e(nc|ncodedcommand)?\s+[a-z0-9+/=]{20,}|frombase64string|downloadstring|downloadfile|invoke-webrequest|\biwr\b|invoke-expression|\biex\b|-w(indowstyle)?\s+h(idden)?|-urlcache|/transfer\s|javascript:|scrobj\.dll|delete\s+shadows|shadowcopy\s+delete|wevtutil(\.exe)?\s+cl\b|recoveryenabled\s+no|net1?(\.exe)?\s+user\s+\S+\s+\S+\s+/add|net1?(\.exe)?\s+localgroup\s+administra)</field>
+    <description>Linha de comando suspeita em $(win.system.computer): $(win.eventdata.commandLine)</description>
+    <mitre>
+      <id>T1059.001</id>
+      <id>T1218</id>
+    </mitre>
+  </rule>
+
+  <!-- Binário com nome de processo do sistema rodando fora do lugar (masquerading) -->
+  <rule id="103126" level="12">
+    <if_sid>67027</if_sid>
+    <field name="win.eventdata.newProcessName" type="pcre2">(?i)^(?!([a-z]:|\\+device\\+harddiskvolume\d+)\\+windows\\+(system32|syswow64|winsxs)\\+).*\\+(svchost|lsass|services|csrss|winlogon|smss|wininit|taskhostw|rundll32|dllhost|conhost|runtimebroker|spoolsv)\.exe$</field>
+    <description>Processo com nome de sistema fora da pasta do Windows em $(win.system.computer): $(win.eventdata.newProcessName)</description>
+    <mitre>
+      <id>T1036.005</id>
+    </mitre>
+  </rule>
+
+  <!-- Execução a partir de pastas graváveis pelo usuário (Temp, Downloads, Public, ProgramData...) -->
+  <rule id="103127" level="7">
+    <if_sid>67027</if_sid>
+    <field name="win.eventdata.newProcessName" type="pcre2">(?i)^c:\\+(users\\+[^\\]+\\+(appdata\\+local\\+temp|appdata\\+roaming|downloads|desktop|documents)|users\\+public|programdata|windows\\+temp|perflogs)\\+</field>
+    <description>Executável rodando de pasta gravável pelo usuário em $(win.system.computer): $(win.eventdata.newProcessName)</description>
+    <mitre>
+      <id>T1204.002</id>
+    </mitre>
+  </rule>
+
+  <!-- Exemplo de exceção para a 103127: adicione aqui apps legítimos que rodam dessas pastas -->
+  <!--
+  <rule id="103128" level="0">
+    <if_sid>103127</if_sid>
+    <field name="win.eventdata.newProcessName" type="pcre2">(?i)\\+appdata\\+roaming\\+zoom\\+bin\\+zoom\.exe$</field>
+    <description>Exceção: Zoom rodando de AppData\Roaming</description>
+  </rule>
+  -->
+
+  <!-- O próprio serviço do PsExec iniciando -->
+  <rule id="103129" level="10">
+    <if_sid>67027</if_sid>
+    <field name="win.eventdata.newProcessName" type="pcre2">(?i)\\psexesvc\.exe$</field>
+    <description>Serviço do PsExec iniciado em $(win.system.computer)</description>
+    <mitre>
+      <id>T1569.002</id>
+    </mitre>
+  </rule>
+
+  <!-- ========== Logon em cache e desbloqueio de estação ========== -->
+  <!-- Tipos de logon: 7 = Unlock | 11 = CachedInteractive | 13 = CachedUnlock -->
+
+  <!-- Desbloqueio comum (online, validado no DC): silencia -->
+  <rule id="103130" level="0">
+    <if_sid>60106, 67022</if_sid>
+    <field name="win.system.eventID">^4624$</field>
+    <field name="win.eventdata.logonType">^7$</field>
+    <description>Desbloqueio de estação por $(win.eventdata.targetUserName) em $(win.system.computer) (esperado)</description>
+  </rule>
+
+  <!-- Logon ou desbloqueio com credencial em cache (máquina sem contato com o DC) -->
+  <rule id="103131" level="5">
+    <if_sid>60106, 67022</if_sid>
+    <field name="win.system.eventID">^4624$</field>
+    <field name="win.eventdata.logonType">^11$|^13$</field>
+    <description>Logon com credencial em cache (tipo $(win.eventdata.logonType)) por $(win.eventdata.targetUserName) em $(win.system.computer)</description>
+    <mitre>
+      <id>T1078</id>
+    </mitre>
+  </rule>
+
+  <!-- Falha ao desbloquear a estação -->
+  <rule id="103132" level="4">
+    <if_sid>60122</if_sid>
+    <field name="win.eventdata.logonType">^7$</field>
+    <description>Falha ao desbloquear $(win.system.computer) com a conta $(win.eventdata.targetUserName)</description>
+  </rule>
+
+  <!-- Várias falhas de desbloqueio na mesma máquina -->
+  <rule id="103133" level="10" frequency="5" timeframe="120">
+    <if_matched_sid>103132</if_matched_sid>
+    <same_field>win.system.computer</same_field>
+    <description>Várias falhas de desbloqueio em $(win.system.computer) em 2 minutos</description>
+    <mitre>
+      <id>T1110.001</id>
+    </mitre>
+  </rule>
+
+</group>

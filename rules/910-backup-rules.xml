@@ -1,0 +1,37 @@
+<!--  ===========================================================================
+Categoria: Backup
+Descrição: Regras de monitoramento das rotinas de backup: execuções com
+sucesso (diário, semanal e mensal) e falhas.
+Dependência: logs de backup em JSON com o campo backup_status
+(e opcionalmente tipo_backup, responsavel, diretorio_backup, duracao_segundos,
+total_arquivos e data_inicio)
+
+Faixa de IDs:
+101600 - 101699
+============================================================================= -->
+
+<group name="local,backup,wazuh,">
+
+  <!-- Backup concluído com sucesso -->
+  <rule id="101600" level="3">
+    <decoded_as>json</decoded_as>
+    <field name="backup_status">^sucesso$</field>
+    <description>Backup executado com sucesso por $(responsavel) em $(duracao_segundos) segundos: $(total_arquivos) arquivos em $(diretorio_backup)</description>
+  </rule>
+
+  <!-- Só dispara para logs que tenham o campo tipo_backup
+       (o backup do Wazuh Manager não envia esse campo) -->
+  <rule id="101601" level="3">
+    <if_sid>101600</if_sid>
+    <field name="tipo_backup">^diario$|^semanal$|^mensal$</field>
+    <description>Backup $(tipo_backup) executado com sucesso</description>
+  </rule>
+
+  <!-- Qualquer status diferente de sucesso -->
+  <rule id="101602" level="10">
+    <decoded_as>json</decoded_as>
+    <field name="backup_status" type="pcre2">^(?!sucesso$).+</field>
+    <description>Falha no backup (status: $(backup_status)) iniciado em $(data_inicio) por $(responsavel), destino $(diretorio_backup)</description>
+  </rule>
+
+</group>

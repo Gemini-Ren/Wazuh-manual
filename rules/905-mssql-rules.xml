@@ -1,0 +1,46 @@
+<!--  ===========================================================================
+Categoria: Banco de Dados - Falhas de Autenticação (MS SQL Server)
+Descrição: Regras de falha de login no SQL Server: falha individual,
+falhas fora do expediente (22h às 8h), possível força bruta e falhas
+repetidas no mesmo servidor.
+Observação: o horário considerado é o do servidor Wazuh (manager)
+
+Faixa de IDs:
+100800 - 100899
+============================================================================= -->
+
+<group name="MSSQL,authentication_failed,">
+
+  <!-- O grupo mssql_auth_failed permite que as correlações contem as falhas
+       dentro e fora do horário juntas -->
+  <rule id="100800" level="2">
+    <if_sid>61071</if_sid>
+    <description>MS SQL: tentativa de login falhou em $(win.system.computer): $(win.eventdata.data)</description>
+    <group>mssql_auth_failed,</group>
+  </rule>
+
+  <!-- Fora do expediente -->
+  <rule id="100801" level="11">
+    <if_sid>100800</if_sid>
+    <time>22:00 - 08:00</time>
+    <description>MS SQL: tentativa de login falhou em $(win.system.computer) fora do expediente (22h às 8h): $(win.eventdata.data)</description>
+    <group>mssql_auth_failed,</group>
+  </rule>
+
+  <!-- Repetição no mesmo servidor: a mais grave vem primeiro -->
+  <rule id="100802" level="12" frequency="20" timeframe="300">
+    <if_matched_group>mssql_auth_failed</if_matched_group>
+    <same_field>win.system.computer</same_field>
+    <description>MS SQL: possível força bruta, 20 falhas de login em 5 minutos em $(win.system.computer)</description>
+    <mitre>
+      <id>T1110</id>
+    </mitre>
+  </rule>
+
+  <rule id="100803" level="7" frequency="5" timeframe="3600">
+    <if_matched_group>mssql_auth_failed</if_matched_group>
+    <same_field>win.system.computer</same_field>
+    <description>MS SQL: múltiplas falhas de login em $(win.system.computer) na última hora</description>
+  </rule>
+
+</group>

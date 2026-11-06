@@ -1,0 +1,85 @@
+<!--  ===========================================================================
+Categoria: Firewall / Auditoria
+Descrição: Regras de auditoria do firewall: alterações de configuração,
+login e logout na WebGUI, autenticação do Squid e erros de LDAP.
+Dependência: decoder audit-fw
+
+Faixa de IDs:
+102000 - 102099
+============================================================================= -->
+
+<group name="audit,fw,">
+
+  <!-- ========== Configuração e sessão ========== -->
+  <rule id="102000" level="3">
+    <decoded_as>audit-fw</decoded_as>
+    <match>changed configuration</match>
+    <description>[AUDIT] O usuário $(srcuser) alterou as configurações do $(hostname)</description>
+  </rule>
+
+  <rule id="102001" level="3">
+    <decoded_as>audit-fw</decoded_as>
+    <match>User logged out</match>
+    <description>[AUDIT] O usuário $(srcuser) desconectou do $(hostname)</description>
+  </rule>
+
+  <!-- ========== WebGUI ========== -->
+  <!-- CONFIRMAR: as expressões de sucesso/falha precisam bater com o texto real do log -->
+  <rule id="102002" level="5">
+    <decoded_as>audit-fw</decoded_as>
+    <match>WebGui</match>
+    <regex type="pcre2">(?i)(fail|error|denied|invalid)</regex>
+    <description>[AUDIT] O usuário $(srcuser) falhou ao se autenticar na WebGUI do $(hostname)</description>
+  </rule>
+
+  <rule id="102003" level="5">
+    <decoded_as>audit-fw</decoded_as>
+    <match>WebGui</match>
+    <description>[AUDIT] O usuário $(srcuser) autenticou na WebGUI do $(hostname)</description>
+  </rule>
+
+  <rule id="102004" level="3">
+    <decoded_as>audit-fw</decoded_as>
+    <match>Successful login</match>
+    <description>[AUDIT] O usuário $(srcuser) fez login com sucesso no $(hostname)</description>
+  </rule>
+
+  <!-- ========== LDAP ========== -->
+  <rule id="102005" level="0">
+    <decoded_as>audit-fw</decoded_as>
+    <match>bind error</match>
+    <description>[AUDIT] Erro de bind no LDAP</description>
+  </rule>
+
+  <!-- ========== Squid ========== -->
+  <rule id="102006" level="0">
+    <decoded_as>audit-fw</decoded_as>
+    <match>could not authenticate</match>
+    <description>[AUDIT] O usuário $(srcuser) não conseguiu se autenticar no Squid</description>
+  </rule>
+
+  <rule id="102007" level="10" frequency="6" timeframe="60">
+    <if_matched_sid>102006</if_matched_sid>
+    <same_user />
+    <description>[AUDIT] Múltiplas falhas de autenticação no Squid do usuário $(srcuser)</description>
+  </rule>
+
+  <rule id="102008" level="0">
+    <decoded_as>audit-fw</decoded_as>
+    <match>failed authentication</match>
+    <description>[AUDIT] O usuário $(srcuser) falhou ao se autenticar no Squid</description>
+  </rule>
+
+  <rule id="102009" level="10" frequency="6" timeframe="60">
+    <if_matched_sid>102008</if_matched_sid>
+    <same_user />
+    <description>[AUDIT] Múltiplas falhas de autenticação no Squid do usuário $(srcuser)</description>
+  </rule>
+
+  <rule id="102010" level="5">
+    <decoded_as>audit-fw</decoded_as>
+    <match>authenticated successfully</match>
+    <description>[AUDIT] O usuário $(srcuser) se autenticou com sucesso no Squid</description>
+  </rule>
+
+</group>

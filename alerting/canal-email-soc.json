@@ -1,0 +1,16 @@
+{
+  "config_id": "email-soc",
+  "config": {
+    "name": "E-mail SOC",
+    "description": "Destinatários dos alertas do Wazuh (mesmos do ossec.conf)",
+    "config_type": "email",
+    "is_enabled": true,
+    "email": {
+      "email_account_id": "smtp-wazuh",
+      "recipient_list": [
+        { "recipient": "soc@exemplo.com.br" }
+      ],
+      "email_group_id_list": []
+    }
+  }
+}
